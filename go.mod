@@ -1,6 +1,6 @@
 module github.com/alrayyes/form-handler
 
-go 1.26.5
+go 1.25
 
 require github.com/testcontainers/testcontainers-go v0.44.0
 
