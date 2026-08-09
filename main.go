@@ -8,7 +8,10 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,12 +25,48 @@ import (
 )
 
 func main() {
+	// -healthcheck exists because the image is distroless: there is no shell,
+	// no wget and no curl for a container healthcheck to run. The binary is the
+	// only executable in there, so it has to be able to probe itself.
+	healthcheck := flag.Bool("healthcheck", false, "probe the local /healthz and exit")
+	flag.Parse()
+
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	if *healthcheck {
+		if err := probe(); err != nil {
+			log.Error("healthcheck failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(log); err != nil {
 		log.Error("exiting", "error", err)
 		os.Exit(1)
 	}
+}
+
+// probe asks the running process whether it is serving. Talks to itself over
+// the loopback rather than the configured ADDR, which may be a wildcard bind.
+func probe() error {
+	addr := env("ADDR", ":8080")
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("ADDR %q: %w", addr, err)
+	}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	res, err := client.Get("http://127.0.0.1:" + port + "/healthz")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("status %d", res.StatusCode)
+	}
+	return nil
 }
 
 func run(log *slog.Logger) error {
