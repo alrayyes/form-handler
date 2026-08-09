@@ -1,0 +1,4 @@
+.git
+.github/workflows/ci.yml
+README.md
+*_test.go

@@ -1,0 +1,22 @@
+# Same commands CI runs, so the two cannot drift.
+pre-commit:
+  commands:
+    fmt:
+      glob: "*.go"
+      run: gofmt -l {staged_files} | (! grep .)
+    lint:
+      glob: "*.go"
+      run: golangci-lint run ./...
+    hadolint:
+      glob: "Dockerfile"
+      run: docker run --rm -i hadolint/hadolint:v2.14.0-alpine hadolint --failure-threshold warning - < Dockerfile
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx --bun commitlint@20.1.0 --extends @commitlint/config-conventional@20.1.0 --edit {1}
+
+pre-push:
+  commands:
+    test:
+      run: go test ./...
