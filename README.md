@@ -2,7 +2,6 @@
 
 [![pipeline](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg)](https://github.com/alrayyes/form-handler/actions)
 [![coverage](https://img.shields.io/badge/coverage-go%20test-00ADD8)](https://github.com/alrayyes/form-handler/actions)
-[![release](https://img.shields.io/github/v/release/alrayyes/form-handler)](https://github.com/alrayyes/form-handler/releases)
 [![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
 
@@ -208,6 +207,18 @@ and the version number depends on those messages being right.
 
 ## Releases
 
+**Paused.** The jobs below are commented out in `.github/workflows/ci.yml` and there are no
+releases yet — see [issue #3][releases-issue]. They work: the tag job ran for
+real and got as far as computing `v0.1.0` before it stopped at the one thing it
+does not have, a `RELEASE_TOKEN`. Rather than leave a job failing on every push to
+master — which only teaches people to ignore a red pipeline — they wait there
+until the token exists. Until then the deployed image is identified by its digest
+and the short SHA, not a version.
+
+The rest of this section describes what happens once they are switched back on.
+
+[releases-issue]: https://github.com/alrayyes/form-handler/issues/3
+
 Nobody picks a version. When something lands on `master`, CI asks
 [svu](https://github.com/caarlos0/svu) what the commits since the last tag add up
 to — `feat:` takes the minor, `fix:` the patch, a `BREAKING CHANGE:` footer the
@@ -222,8 +233,8 @@ That commit is the one exception to nothing-but-humans-writes-to-`master`.
 This needs a `RELEASE_TOKEN` CI variable — a project access token with `api` and
 `contents:write` scope, **masked** and **protected**. The pipeline's own job
 token cannot push a tag, and a tag it pushed would not start the pipeline that
-publishes the release. Protect the `v*` tag pattern too, or the publish job will
-not see the variable.
+publishes the release. The `v*` tag pattern is already protected, so that half is
+done.
 
 ## Deploying
 
