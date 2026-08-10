@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Command form-handler accepts the andthensome.nl contact form and emails it on.
 //
 // Cloudflare Workers can send mail through an HTTP email API but cannot open an

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //go:build integration
 
 // The outer test. It runs a real mail server in a container, posts a real
