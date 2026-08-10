@@ -11,11 +11,15 @@ RUN go mod download
 
 COPY . .
 
+# What the running container answers when asked what it is. CI passes the tag on
+# a release build; a local `docker build .` gets "dev", which is the truth.
+ARG VERSION=dev
+
 # CGO off so the binary is static and the final stage can be distroless.
 # -trimpath keeps build machine paths out of the binary, which also makes the
 # build reproducible enough to compare two of them.
 ENV CGO_ENABLED=0
-RUN go build -trimpath -ldflags="-s -w" -o /out/form-handler .
+RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/form-handler .
 
 # Distroless: no shell, no package manager, nothing to exec into if this is ever
 # reached from outside. nonroot rather than root, and the port is above 1024 so

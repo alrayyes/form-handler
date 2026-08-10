@@ -24,12 +24,23 @@ import (
 	"github.com/alrayyes/form-handler/internal/mail"
 )
 
+// version is stamped in at build time — by goreleaser from the tag, and by the
+// Dockerfile from its VERSION build argument. "dev" is what you get from a plain
+// `go build`, which is the honest answer for a binary built off an unknown tree.
+var version = "dev"
+
 func main() {
 	// -healthcheck exists because the image is distroless: there is no shell,
 	// no wget and no curl for a container healthcheck to run. The binary is the
 	// only executable in there, so it has to be able to probe itself.
 	healthcheck := flag.Bool("healthcheck", false, "probe the local /healthz and exit")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -120,7 +131,7 @@ func run(log *slog.Logger) error {
 
 	errs := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", addr, "origins", origins)
+		log.Info("listening", "version", version, "addr", addr, "origins", origins)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errs <- err
 		}
