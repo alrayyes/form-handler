@@ -3,16 +3,6 @@
   "extends": ["config:recommended"],
   "customManagers": [
     {
-      "description": "CLIs the hooks run through bunx. There is no package.json for a manager to read, so the version pinned in the command is the only place they exist.",
-      "customType": "regex",
-      "managerFilePatterns": ["/^lefthook\\.yml$/"],
-      "matchStrings": [
-        "bunx --bun (?<depName>[a-z0-9-]+)@(?<currentValue>[\\w.-]+)",
-        "--extends (?<depName>@[a-z0-9/-]+)@(?<currentValue>[\\w.-]+)"
-      ],
-      "datasourceTemplate": "npm"
-    },
-    {
       "description": "svu, which the release job installs rather than pulling as an image because the published image lags the releases.",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github-ci\\.yml$/"],

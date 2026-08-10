@@ -30,8 +30,9 @@ To work on it, additionally:
 - **Docker**, for the integration test — it starts a real mail server in a
   container — and for the Dockerfile lint.
 - **[lefthook](https://lefthook.dev)** for the git hooks, and
-  **[bun](https://bun.sh)**, which the hooks use to run commitlint and
-  markdownlint without a `package.json`.
+  **[bun](https://bun.sh)** to install the two linters that are not Go —
+  commitlint and markdownlint. There is a `package.json`, but nothing here is
+  JavaScript; it exists only so those two resolve.
 - **[golangci-lint](https://golangci-lint.run)** v2, which the pre-commit hook
   runs. CI pins v2.6.2; matching it locally saves you a surprise in the pipeline.
 
@@ -52,9 +53,11 @@ Or take the image CI builds, which is what actually runs in production:
 docker pull ghcr.io/alrayyes/form-handler:latest
 ```
 
-Working on it? Install the hooks once, or they silently do nothing:
+Working on it? Install the linters and the hooks once — an uninstalled hook
+silently does nothing, which is worse than not having one:
 
 ```sh
+bun install
 lefthook install
 ```
 

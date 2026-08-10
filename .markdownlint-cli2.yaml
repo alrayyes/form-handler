@@ -6,6 +6,7 @@ globs:
 
 ignores:
   - CHANGELOG.md # written by the release job, not by hand
+  - "**/node_modules/**" # other people's READMEs, held to other people's rules
 
 config:
   MD013:

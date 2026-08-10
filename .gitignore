@@ -1,2 +1,4 @@
 /form-handler
 /dist
+/node_modules
+/.bun-cache

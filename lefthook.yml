@@ -12,12 +12,15 @@ pre-commit:
       run: docker run --rm -i hadolint/hadolint:v2.14.0-alpine hadolint --failure-threshold warning - < Dockerfile
     markdown:
       glob: "*.md"
-      run: bunx --bun markdownlint-cli2@0.23.2 {staged_files}
+      run: bunx markdownlint-cli2 {staged_files}
 
 commit-msg:
   commands:
+    # Resolved from node_modules rather than fetched by bunx: commitlint has to
+    # load the config its own config extends, and bunx cannot resolve a sibling
+    # package for it. Run `bun install` if this cannot find itself.
     commitlint:
-      run: bunx --bun commitlint@20.1.0 --extends @commitlint/config-conventional@20.1.0 --edit {1}
+      run: bunx commitlint --edit {1}
 
 pre-push:
   commands:
