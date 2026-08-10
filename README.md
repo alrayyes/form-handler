@@ -183,7 +183,9 @@ what ends up in the changelog. `feat:` and `fix:` are the two that release.
 
 The hooks run the same commands CI does, so a green pre-commit means a green
 lint stage: `gofmt` and `golangci-lint` on staged Go files, hadolint on the
-Dockerfile, markdownlint on Markdown, and `go test ./...` before a push.
+Dockerfile, markdownlint on Markdown, and `go test ./...` before a push. CI runs
+commitlint over the whole branch as well, since a hook is something you can skip
+and the version number depends on those messages being right.
 
 ## Releases
 
