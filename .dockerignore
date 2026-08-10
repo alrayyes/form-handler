@@ -1,4 +1,8 @@
 .git
 .github/workflows/ci.yml
 README.md
+CHANGELOG.md
 *_test.go
+# goreleaser's output. Two Linux binaries and their archives, which would
+# otherwise be shipped to the daemon as build context on every local build.
+/dist
