@@ -2,7 +2,9 @@
 
 [![pipeline](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg)](https://github.com/alrayyes/form-handler/actions)
 [![coverage](https://img.shields.io/badge/coverage-go%20test-00ADD8)](https://github.com/alrayyes/form-handler/actions)
-[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![release](https://img.shields.io/github/v/release/alrayyes/form-handler)](https://github.com/alrayyes/form-handler/releases)
+[![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
 
 Takes the contact form on [andthensome.nl](https://www.andthensome.nl) and turns
 it into an email. That is the whole job.
@@ -11,6 +13,50 @@ It exists because Cloudflare Workers cannot open an SMTP connection. Workers can
 send mail through an HTTP email API, but the mail for this domain is self-hosted,
 so a small service that can speak SMTP is the simpler answer than routing the
 site's contact form through a third party.
+
+## Requirements
+
+To run it:
+
+- **Go 1.25 or newer**, or Docker if you would rather run the image.
+- **An SMTP server** it may send through. In production that is the mail bridge
+  on the same host; locally it is a throwaway container, below.
+- **A sending address the mail server will accept**, and somewhere to deliver to
+  — `MAIL_FROM` and `MAIL_TO`. There are no defaults for these and the service
+  refuses to start without them.
+
+To work on it, additionally:
+
+- **Docker**, for the integration test — it starts a real mail server in a
+  container — and for the Dockerfile lint.
+- **[lefthook](https://lefthook.dev)** for the git hooks, and
+  **[bun](https://bun.sh)**, which the hooks use to run commitlint and
+  markdownlint without a `package.json`.
+- **[golangci-lint](https://golangci-lint.run)** v2, which the pre-commit hook
+  runs. CI pins v2.6.2; matching it locally saves you a surprise in the pipeline.
+
+Nothing else needs installing: the Go dependencies come from `go.mod`, and every
+other tool runs from a pinned container image or through `bunx`.
+
+## Installation
+
+```sh
+git clone https://github.com/alrayyes/form-handler.git
+cd form-handler
+go build .
+```
+
+Or take the image CI builds, which is what actually runs in production:
+
+```sh
+docker pull ghcr.io/alrayyes/form-handler:latest
+```
+
+Working on it? Install the hooks once, or they silently do nothing:
+
+```sh
+lefthook install
+```
 
 ## Running it
 
@@ -41,6 +87,17 @@ MAIL_FROM=site@example.com MAIL_TO=info@example.com go run .
 
 Mailpit's web interface is on <http://localhost:8025>, and anything the service
 sends will appear there instead of the internet.
+
+Two flags, both for asking the binary about itself rather than for running it:
+
+```sh
+form-handler -version      # the tag it was built from, or "dev"
+form-handler -healthcheck  # probe the local /healthz and exit non-zero if it fails
+```
+
+`-healthcheck` exists because the image is distroless. There is no shell and no
+curl in there for a container healthcheck to run, so the binary has to be able to
+probe itself.
 
 ## The endpoint
 
@@ -111,11 +168,52 @@ reaches the sender only show up when something real parses the message.
 
 It is behind a build tag so `go test ./...` stays fast; CI runs both.
 
+## Contributing
+
+Branch, push, open a pull request, and let someone else merge it. Link the issue
+it answers with `Closes #12`, so merging closes the loop.
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org)
+— the `commit-msg` hook will tell you if yours does not, and it is not being
+fussy for its own sake: those messages are what pick the next version number and
+what ends up in the changelog. `feat:` and `fix:` are the two that release.
+
+The hooks run the same commands CI does, so a green pre-commit means a green
+lint stage: `gofmt` and `golangci-lint` on staged Go files, hadolint on the
+Dockerfile, markdownlint on Markdown, and `go test ./...` before a push.
+
+## Releases
+
+Nobody picks a version. When something lands on `master`, CI asks
+[svu](https://github.com/caarlos0/svu) what the commits since the last tag add up
+to — `feat:` takes the minor, `fix:` the patch, a `BREAKING CHANGE:` footer the
+major — and tags it if that differs from the current tag. A batch of only `docs:`
+and `chore:` releases nothing, which is the intent.
+
+The tag then triggers [goreleaser](https://goreleaser.com), which builds the
+Linux binaries, writes the GitHub release with notes grouped by change type, and
+pushes the same notes into `CHANGELOG.md` on `master` in a `[skip ci]` commit.
+That commit is the one exception to nothing-but-humans-writes-to-`master`.
+
+This needs a `RELEASE_TOKEN` CI variable — a project access token with `api` and
+`contents:write` scope, **masked** and **protected**. The pipeline's own job
+token cannot push a tag, and a tag it pushed would not start the pipeline that
+publishes the release. Protect the `v*` tag pattern too, or the publish job will
+not see the variable.
+
 ## Deploying
 
 CI builds and pushes an image to this project's registry on every commit to
-`master`, tagged with the short SHA and `latest`, and prints the digest.
+`master` and on every release tag, and prints the digest. A release build is
+tagged with the version; a `master` build with the short SHA. Both also move
+`latest`.
 
 Pin the **digest** in the compose file over in `vps-docker`, not the tag. A tag
 can be moved; a digest cannot, which is the difference between knowing what is
-running and assuming it.
+running and assuming it. `form-handler -version` inside the container tells you
+which release that digest is, so pinning a digest no longer means losing the
+version.
+
+## Licence
+
+[GPL-3.0-or-later](LICENSE). Every source file carries the SPDX identifier.
