@@ -21,7 +21,7 @@ go run .
 It listens on `:8080` and needs, at minimum, somewhere to send mail:
 
 | Variable | Default | What it does |
-|---|---|---|
+| --- | --- | --- |
 | `MAIL_FROM` | *required* | Envelope and header sender. Must be an address the mail server will accept. |
 | `MAIL_TO` | *required* | Where submissions land. |
 | `SMTP_ADDR` | `localhost:1025` | `host:port` of the mail server. |
@@ -59,7 +59,7 @@ sends will appear there instead of the internet.
 is automated. Unknown fields are rejected outright.
 
 | Status | Meaning |
-|---|---|
+| --- | --- |
 | `202` | Accepted. Also what a honeypot submission gets — see below. |
 | `400` | The body could not be read, or contained fields we do not know. |
 | `403` | The `Origin` is not in `ALLOWED_ORIGINS`. |

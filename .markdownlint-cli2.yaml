@@ -1,0 +1,17 @@
+# Markdown this repo owns. There is not much of it, but the README is the first
+# thing anyone reads and a broken link or a heading level skipped is exactly the
+# sort of thing nobody notices while writing it.
+globs:
+  - "**/*.md"
+
+ignores:
+  - CHANGELOG.md # written by the release job, not by hand
+
+config:
+  MD013:
+    # Prose stays at 80 so the diff of a reworded paragraph is the paragraph.
+    line_length: 80
+    # Tables and code blocks are exempt: a pinned image digest and a table row
+    # cannot be wrapped, and mangling them to satisfy a number reads worse.
+    tables: false
+    code_blocks: false
