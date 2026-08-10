@@ -6,7 +6,12 @@ globs:
 
 ignores:
   - CHANGELOG.md # written by the release job, not by hand
-  - "**/node_modules/**" # other people's READMEs, held to other people's rules
+  # Other people's READMEs, held to other people's rules. Both of these are
+  # gitignored, but a glob does not know that: node_modules is where the linters
+  # themselves live, and .bun-cache is where CI puts bun's cache, because GitHub
+  # can only cache paths inside the project directory.
+  - "**/node_modules/**"
+  - "**/.bun-cache/**"
 
 config:
   MD013:
