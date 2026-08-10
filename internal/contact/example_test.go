@@ -1,0 +1,61 @@
+package contact_test
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/alrayyes/form-handler/internal/contact"
+)
+
+// The ordinary path: an untrusted Submission goes in, a Message that has been
+// through validation comes out, and the subject is built for you.
+func ExampleValidate() {
+	msg, err := contact.Validate(contact.Submission{
+		Name:    "Ada Lovelace",
+		Email:   "ada@example.com",
+		Message: "Please get in touch about an awkward system.",
+	})
+	if err != nil {
+		fmt.Println("rejected:", err)
+		return
+	}
+
+	fmt.Println(msg.Subject)
+	fmt.Println(msg.Email)
+	// Output:
+	// Contact form: Ada Lovelace
+	// ada@example.com
+}
+
+// A caught bot is an error, but not one to show anyone: answer it exactly as
+// you would a real submission, because telling it which field gave it away only
+// teaches whoever wrote it what to leave alone next time.
+func ExampleValidate_honeypot() {
+	_, err := contact.Validate(contact.Submission{
+		Name:    "Bot",
+		Email:   "bot@example.com",
+		Message: "Cheap watches, buy now please.",
+		Website: "http://spam.example",
+	})
+
+	fmt.Println(errors.Is(err, contact.ErrSpam))
+	// Output:
+	// true
+}
+
+// A rejected field says which one and why, so the browser can point at it
+// rather than showing a generic failure.
+func ExampleValidate_validationError() {
+	_, err := contact.Validate(contact.Submission{
+		Name:    "Ada Lovelace",
+		Email:   "not-an-address",
+		Message: "Please get in touch about an awkward system.",
+	})
+
+	var ve contact.ValidationError
+	if errors.As(err, &ve) {
+		fmt.Println(ve.Field, "->", ve.Reason)
+	}
+	// Output:
+	// email -> not a valid address
+}
