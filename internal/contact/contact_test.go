@@ -1,9 +1,11 @@
 package contact_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/alrayyes/form-handler/internal/contact"
 )
@@ -18,15 +20,10 @@ func valid() contact.Submission {
 
 func TestValidateAcceptsAGoodSubmission(t *testing.T) {
 	msg, err := contact.Validate(valid())
-	if err != nil {
-		t.Fatalf("Validate() = %v, want nil", err)
-	}
-	if msg.Email != "ada@example.com" {
-		t.Errorf("email = %q", msg.Email)
-	}
-	if msg.Subject != "Contact form: Ada Lovelace" {
-		t.Errorf("subject = %q", msg.Subject)
-	}
+
+	require.NoError(t, err)
+	assert.Equal(t, "ada@example.com", msg.Email)
+	assert.Equal(t, "Contact form: Ada Lovelace", msg.Subject)
 }
 
 func TestValidateTrimsBeforeMeasuring(t *testing.T) {
@@ -36,9 +33,8 @@ func TestValidateTrimsBeforeMeasuring(t *testing.T) {
 	_, err := contact.Validate(s)
 
 	var ve contact.ValidationError
-	if !errors.As(err, &ve) || ve.Field != "name" {
-		t.Fatalf("Validate() = %v, want a name validation error", err)
-	}
+	require.ErrorAs(t, err, &ve)
+	assert.Equal(t, "name", ve.Field)
 }
 
 func TestValidateRejectsBadInput(t *testing.T) {
@@ -66,12 +62,8 @@ func TestValidateRejectsBadInput(t *testing.T) {
 			_, err := contact.Validate(s)
 
 			var ve contact.ValidationError
-			if !errors.As(err, &ve) {
-				t.Fatalf("Validate() = %v, want a ValidationError", err)
-			}
-			if ve.Field != tc.field {
-				t.Errorf("field = %q, want %q", ve.Field, tc.field)
-			}
+			require.ErrorAs(t, err, &ve)
+			assert.Equal(t, tc.field, ve.Field)
 		})
 	}
 }
@@ -82,9 +74,9 @@ func TestValidateCountsRunesNotBytes(t *testing.T) {
 	// exactly at the documented limit.
 	s.Name = strings.Repeat("é", 100)
 
-	if _, err := contact.Validate(s); err != nil {
-		t.Fatalf("Validate() = %v, want nil for a 100-rune name", err)
-	}
+	_, err := contact.Validate(s)
+
+	require.NoError(t, err, "a 100-rune name is exactly at the documented limit")
 }
 
 func TestValidateCatchesTheHoneypot(t *testing.T) {
@@ -93,9 +85,7 @@ func TestValidateCatchesTheHoneypot(t *testing.T) {
 
 	_, err := contact.Validate(s)
 
-	if !errors.Is(err, contact.ErrSpam) {
-		t.Fatalf("Validate() = %v, want ErrSpam", err)
-	}
+	require.ErrorIs(t, err, contact.ErrSpam)
 }
 
 func TestSubjectCannotCarryAHeaderInjection(t *testing.T) {
@@ -103,11 +93,8 @@ func TestSubjectCannotCarryAHeaderInjection(t *testing.T) {
 	s.Name = "Ada\r\nBcc: everyone@example.com"
 
 	msg, err := contact.Validate(s)
-	if err != nil {
-		t.Fatalf("Validate() = %v", err)
-	}
 
-	if strings.ContainsAny(msg.Subject, "\r\n") {
-		t.Fatalf("subject contains a line break: %q", msg.Subject)
-	}
+	require.NoError(t, err)
+	assert.NotContains(t, msg.Subject, "\r")
+	assert.NotContains(t, msg.Subject, "\n")
 }

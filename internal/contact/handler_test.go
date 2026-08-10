@@ -10,6 +10,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/alrayyes/form-handler/internal/contact"
 )
 
@@ -62,12 +65,8 @@ func TestPostSendsTheMessage(t *testing.T) {
 
 	res := post(t, newHandler(mailer, 100), goodBody, origin)
 
-	if res.Code != http.StatusAccepted {
-		t.Fatalf("status = %d, want 202: %s", res.Code, res.Body)
-	}
-	if mailer.count() != 1 {
-		t.Fatalf("sent %d messages, want 1", mailer.count())
-	}
+	require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
+	assert.Equal(t, 1, mailer.count())
 }
 
 func TestOriginsOtherThanOursAreRefused(t *testing.T) {
@@ -75,14 +74,10 @@ func TestOriginsOtherThanOursAreRefused(t *testing.T) {
 
 	res := post(t, newHandler(mailer, 100), goodBody, "https://someone-else.example")
 
-	if res.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", res.Code)
-	}
+	require.Equal(t, http.StatusForbidden, res.Code)
 	// The point: refusing the CORS header is not enough, because the request
 	// still arrived and would still have sent mail.
-	if mailer.count() != 0 {
-		t.Fatal("a disallowed origin still sent mail")
-	}
+	assert.Zero(t, mailer.count(), "a disallowed origin still sent mail")
 }
 
 func TestPreflightIsAnswered(t *testing.T) {
@@ -92,12 +87,8 @@ func TestPreflightIsAnswered(t *testing.T) {
 
 	newHandler(&recorder{}, 100).ServeHTTP(res, req)
 
-	if res.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204", res.Code)
-	}
-	if got := res.Header().Get("Access-Control-Allow-Origin"); got != origin {
-		t.Errorf("allow-origin = %q, want %q", got, origin)
-	}
+	require.Equal(t, http.StatusNoContent, res.Code)
+	assert.Equal(t, origin, res.Header().Get("Access-Control-Allow-Origin"))
 }
 
 func TestHoneypotLooksExactlyLikeSuccess(t *testing.T) {
@@ -107,34 +98,22 @@ func TestHoneypotLooksExactlyLikeSuccess(t *testing.T) {
 	spam := post(t, newHandler(mailer, 100), body, origin)
 	good := post(t, newHandler(&recorder{}, 100), goodBody, origin)
 
-	if spam.Code != good.Code {
-		t.Errorf("spam status %d, real status %d — the difference tells a bot what to change", spam.Code, good.Code)
-	}
-	if spam.Body.String() != good.Body.String() {
-		t.Errorf("spam body %q, real body %q", spam.Body.String(), good.Body.String())
-	}
-	if mailer.count() != 0 {
-		t.Fatal("honeypot submission was delivered")
-	}
+	assert.Equal(t, good.Code, spam.Code, "the difference tells a bot what to change")
+	assert.Equal(t, good.Body.String(), spam.Body.String())
+	assert.Zero(t, mailer.count(), "honeypot submission was delivered")
 }
 
 func TestValidationErrorNamesTheField(t *testing.T) {
 	res := post(t, newHandler(&recorder{}, 100), `{"name":"","email":"ada@example.com","message":"long enough to pass"}`, origin)
 
-	if res.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want 422", res.Code)
-	}
-	if !strings.Contains(res.Body.String(), `"field":"name"`) {
-		t.Errorf("body does not name the field: %s", res.Body)
-	}
+	require.Equal(t, http.StatusUnprocessableEntity, res.Code)
+	assert.Contains(t, res.Body.String(), `"field":"name"`)
 }
 
 func TestUnknownFieldsAreRejected(t *testing.T) {
 	res := post(t, newHandler(&recorder{}, 100), `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`, origin)
 
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", res.Code)
-	}
+	require.Equal(t, http.StatusBadRequest, res.Code)
 }
 
 func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
@@ -142,19 +121,14 @@ func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
 	h := newHandler(mailer, 2)
 
 	for i := range 2 {
-		if res := post(t, h, goodBody, origin); res.Code != http.StatusAccepted {
-			t.Fatalf("submission %d: status = %d, want 202", i+1, res.Code)
-		}
+		res := post(t, h, goodBody, origin)
+		require.Equalf(t, http.StatusAccepted, res.Code, "submission %d", i+1)
 	}
 
 	res := post(t, h, goodBody, origin)
 
-	if res.Code != http.StatusTooManyRequests {
-		t.Fatalf("third submission: status = %d, want 429", res.Code)
-	}
-	if mailer.count() != 2 {
-		t.Fatalf("sent %d messages, want 2", mailer.count())
-	}
+	require.Equal(t, http.StatusTooManyRequests, res.Code, "third submission")
+	assert.Equal(t, 2, mailer.count())
 }
 
 func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
@@ -162,14 +136,10 @@ func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
 
 	res := post(t, newHandler(mailer, 100), goodBody, origin)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("status = %d, want 502", res.Code)
-	}
+	require.Equal(t, http.StatusBadGateway, res.Code)
 	// A form that says "thanks" and drops the message is worse than one that
 	// says it failed.
-	if strings.Contains(res.Body.String(), "accepted") {
-		t.Errorf("a failed send reported success: %s", res.Body)
-	}
+	assert.NotContains(t, res.Body.String(), "accepted", "a failed send reported success")
 }
 
 func TestGetIsNotAllowed(t *testing.T) {
@@ -179,7 +149,5 @@ func TestGetIsNotAllowed(t *testing.T) {
 
 	newHandler(&recorder{}, 100).ServeHTTP(res, req)
 
-	if res.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want 405", res.Code)
-	}
+	require.Equal(t, http.StatusMethodNotAllowed, res.Code)
 }
