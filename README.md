@@ -33,8 +33,10 @@ To work on it, additionally:
   **[bun](https://bun.sh)** to install the two linters that are not Go —
   commitlint and markdownlint. There is a `package.json`, but nothing here is
   JavaScript; it exists only so those two resolve.
-- **[golangci-lint](https://golangci-lint.run)** v2, which the pre-commit hook
-  runs. CI pins v2.6.2; matching it locally saves you a surprise in the pipeline.
+- **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
+  hook runs from your `PATH` while CI runs it from a pinned image. Install that
+  version rather than whichever is current: when the two disagree, the hook
+  passes and the pipeline fails, and the reason is not obvious from the failure.
 
 Nothing else needs installing: the Go dependencies come from `go.mod`, and every
 other tool runs from a pinned container image or through `bunx`.
