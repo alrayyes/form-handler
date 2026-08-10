@@ -30,7 +30,10 @@ import (
 
 const origin = "https://www.andthensome.nl"
 
-const mailpitImage = "axllent/mailpit:v1.21.8"
+// Pinned by digest, like every other image this repo pulls. A tag can be moved
+// under you, and a mail server that quietly changed version underneath the one
+// test that proves delivery works is a confusing way to spend an afternoon.
+const mailpitImage = "axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a"
 
 func TestSubmissionArrivesAsEmail(t *testing.T) {
 	ctx := context.Background()

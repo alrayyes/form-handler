@@ -34,7 +34,8 @@ It listens on `:8080` and needs, at minimum, somewhere to send mail:
 For local work, run a throwaway mail server and point at it:
 
 ```sh
-docker run --rm -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.21.8
+docker run --rm -p 1025:1025 -p 8025:8025 \
+  axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a
 MAIL_FROM=site@example.com MAIL_TO=info@example.com go run .
 ```
 
