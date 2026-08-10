@@ -230,7 +230,15 @@ not see the variable.
 CI builds and pushes an image to this project's registry on every commit to
 `master` and on every release tag, and prints the digest. A release build is
 tagged with the version; a `master` build with the short SHA. Both also move
-`latest`.
+`latest`. A branch build runs too, but stops after building — enough to prove
+the Dockerfile still works before you merge, without publishing anything.
+
+The build uses **buildah**, not `docker build`, because there is no Docker
+daemon in the job and giving it one would mean either a privileged runner or a
+mount of the host's socket. buildah builds from the same Dockerfile in its own
+process. It runs with `vfs` storage and `chroot` isolation, since the defaults
+want kernel features an unprivileged container does not have — that costs a few
+seconds on a two-stage Go build and nothing else.
 
 Pin the **digest** in the compose file over in `vps-docker`, not the tag. A tag
 can be moved; a digest cannot, which is the difference between knowing what is
