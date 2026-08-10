@@ -28,7 +28,7 @@ To run it:
 To work on it, additionally:
 
 - **Docker**, for the integration test — it starts a real mail server in a
-  container — and for the Dockerfile lint.
+  container. Not needed to build the image: `ko` does that without a daemon.
 - **[lefthook](https://lefthook.dev)** for the git hooks, and
   **[bun](https://bun.sh)** to install the two linters that are not Go —
   commitlint and markdownlint. There is a `package.json`, but nothing here is
@@ -201,8 +201,8 @@ fussy for its own sake: those messages are what pick the next version number and
 what ends up in the changelog. `feat:` and `fix:` are the two that release.
 
 The hooks run the same commands CI does, so a green pre-commit means a green
-lint stage: `gofmt` and `golangci-lint` on staged Go files, hadolint on the
-Dockerfile, markdownlint on Markdown, and `go test ./...` before a push. CI runs
+lint stage: `gofmt` and `golangci-lint` on staged Go files, markdownlint on
+Markdown, and `go test ./...` before a push. CI runs
 commitlint over the whole branch as well, since a hook is something you can skip
 and the version number depends on those messages being right.
 
@@ -231,14 +231,25 @@ CI builds and pushes an image to this project's registry on every commit to
 `master` and on every release tag, and prints the digest. A release build is
 tagged with the version; a `master` build with the short SHA. Both also move
 `latest`. A branch build runs too, but stops after building — enough to prove
-the Dockerfile still works before you merge, without publishing anything.
+the image still builds before you merge, without publishing anything.
 
-The build uses **buildah**, not `docker build`, because there is no Docker
-daemon in the job and giving it one would mean either a privileged runner or a
-mount of the host's socket. buildah builds from the same Dockerfile in its own
-process. It runs with `vfs` storage and `chroot` isolation, since the defaults
-want kernel features an unprivileged container does not have — that costs a few
-seconds on a two-stage Go build and nothing else.
+There is no Dockerfile. The image is assembled by **[ko](https://ko.build)**,
+which compiles the binary and writes the layers itself, over the registry API.
+That is not a preference; it is what the runner allows. A Docker daemon in the
+job needs `privileged = true`, and buildah — which needs no daemon — still needs
+`unshare(CLONE_NEWUSER)`, which an unprivileged container cannot do either. ko
+needs neither. What the Dockerfile used to say now lives in `.ko.yaml`: the same
+distroless base, pinned to the same digest it always was.
+
+To build it yourself:
+
+```sh
+VERSION=dev KO_DOCKER_REPO=ko.local ko build --bare --local ./
+```
+
+**The entrypoint is `/ko-app/form-handler`, not `/form-handler`.** ko puts the
+binary under `/ko-app`, so a compose healthcheck that shells the old path will
+fail with "no such file" and the container will sit there unhealthy.
 
 Pin the **digest** in the compose file over in `vps-docker`, not the tag. A tag
 can be moved; a digest cannot, which is the difference between knowing what is

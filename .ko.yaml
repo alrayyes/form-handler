@@ -1,0 +1,36 @@
+# How ko builds the image. This replaced a Dockerfile: the build job has no
+# Docker daemon and cannot be given one without making the runner privileged,
+# and ko needs neither — it compiles the binary and assembles the layers itself.
+#
+# Everything here is what the Dockerfile used to say, so the resulting image is
+# the same one by a different route.
+
+# The identical digest the Dockerfile pinned. Distroless: no shell, no package
+# manager, nothing to exec into if this is ever reached from outside. The
+# :nonroot variant sets the user, so the process does not run as root and the
+# port it binds is above 1024 and needs no privilege.
+defaultBaseImage: gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
+
+builds:
+  - id: form-handler
+    main: .
+    env:
+      # Static, so the distroless base is enough. ko defaults to this; setting
+      # it makes the requirement explicit rather than inherited.
+      - CGO_ENABLED=0
+    flags:
+      # Keeps build machine paths out of the binary, which also makes two
+      # builds of the same commit comparable.
+      - -trimpath
+      # The version below is the only stamp this binary carries, and it is
+      # passed in explicitly. Leaving VCS stamping on means the build fails
+      # whenever go cannot read .git — a shallow CI clone, a different owner
+      # inside the container — for information nothing reads.
+      - -buildvcs=false
+    ldflags:
+      - -s
+      - -w
+      # What the running container answers when asked what it is. CI exports
+      # the tag on a release build and the short SHA otherwise; an unset
+      # VERSION leaves main.go's own "dev" default alone.
+      - -X main.version={{.Env.VERSION}}
