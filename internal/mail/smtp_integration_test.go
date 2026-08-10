@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -107,8 +108,27 @@ func TestHoneypotIsAcceptedButNotDelivered(t *testing.T) {
 	assert.Zero(t, messageCount(t, ctx, apiURL), "the honeypot submission was delivered")
 }
 
+// startMailpit returns a Mailpit to test against, however this machine can get
+// one. Locally that means testcontainers starts a fresh container per test.
+//
+// CI cannot: testcontainers needs a Docker daemon inside the job, and the only
+// ways to give a job one are a privileged dind sidecar or the host's socket —
+// the first lets any job on the runner escape to the host, the second hands it
+// the host's Docker outright. Neither is a trade worth making for a contact
+// form. So the pipeline runs Mailpit as an ordinary GitHub service, a sibling
+// container on the job's network, and points these variables at it.
+//
+// The tests are identical either way; only who started the mail server differs.
 func startMailpit(t *testing.T, ctx context.Context) (smtpAddr, apiURL string) {
 	t.Helper()
+
+	if addr, api := os.Getenv("MAILPIT_SMTP_ADDR"), os.Getenv("MAILPIT_API_URL"); addr != "" && api != "" {
+		// One server for the whole run, unlike the container case where each
+		// test gets its own. Empty it first, or the honeypot test counts the
+		// message the delivery test just sent and reports a leak that isn't.
+		deleteAllMessages(t, ctx, api)
+		return addr, api
+	}
 
 	req := testcontainers.ContainerRequest{
 		Image:        mailpitImage,
@@ -172,6 +192,19 @@ func messageCount(t *testing.T, ctx context.Context, apiURL string) int {
 	}
 	getJSON(t, ctx, apiURL+"/api/v1/messages", &list)
 	return list.Total
+}
+
+// deleteAllMessages empties the mailbox, so a shared Mailpit starts each test
+// as clean as a fresh container would.
+func deleteAllMessages(t *testing.T, ctx context.Context, apiURL string) {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL+"/api/v1/messages", nil)
+	require.NoError(t, err)
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err, "empty the mailbox")
+	defer func() { _ = res.Body.Close() }()
+	require.Equalf(t, http.StatusOK, res.StatusCode, "empty the mailbox")
 }
 
 func getJSON(t *testing.T, ctx context.Context, url string, into any) {

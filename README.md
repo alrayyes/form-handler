@@ -171,6 +171,23 @@ subject and body. It needs a working Docker. The unit tests use a fake mailer an
 prove none of that — header encoding, CRLF handling and whether a reply actually
 reaches the sender only show up when something real parses the message.
 
+If you already have a Mailpit running, point the test at it and it will use that
+instead of starting one of its own:
+
+```sh
+MAILPIT_SMTP_ADDR=127.0.0.1:1025 MAILPIT_API_URL=http://127.0.0.1:8025 \
+  go test -tags=integration ./...
+```
+
+That is how CI runs it, and the reason is worth knowing before you change it.
+Testcontainers needs a Docker daemon *inside* the job, and the only two ways to
+give a job one are a privileged `dind` sidecar or a mount of the host's socket —
+the first lets any job on the runner escape to the host, the second hands it the
+host's Docker outright. Neither is a trade worth making for a contact form, so
+the pipeline runs Mailpit as an ordinary service and sets those two variables.
+The assertions are the same either way. One difference to keep in mind: a shared
+server keeps its messages between tests, so the test empties the mailbox first.
+
 It is behind a build tag so `go test ./...` stays fast; CI runs both.
 
 ## Contributing
