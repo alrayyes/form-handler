@@ -21,8 +21,13 @@ builds:
       - -trimpath
     # The version the binary reports comes from the tag, so a running container
     # can be asked what it is without going back to CI to look it up.
+    #
+    # .Tag rather than .Version: .Version has the leading v stripped, and ko
+    # stamps the image with the tag as-is. Two artefacts of the same release
+    # answering "v1.2.3" and "1.2.3" is fine for a person and a trap for a
+    # script comparing against a release tag.
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -X main.version={{ .Tag }}
 
 archives:
   - formats:
