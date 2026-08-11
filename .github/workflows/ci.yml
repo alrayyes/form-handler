@@ -37,6 +37,11 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
+          # The integration tests are behind a build tag, so without this they
+          # are invisible to the linter — which is how three findings sat in
+          # them unnoticed. They are the tests that matter most; they should be
+          # held to the same standard as what they test.
+          args: --build-tags=integration
       - name: gofmt
         # golangci-lint's formatter reports rather than rewrites here; this is
         # the check that a file was committed unformatted.

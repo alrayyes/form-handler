@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package mail delivers a contact message over SMTP.
-package mail
+// Package smtp delivers a contact message over SMTP. One of the two adapters
+// behind contact.Mailer.
+package smtp
 
 import (
 	"context"
@@ -9,16 +10,19 @@ import (
 	"fmt"
 	"mime"
 	"net"
-	"net/smtp"
+	netsmtp "net/smtp"
 	"strings"
 	"time"
 
 	"github.com/alrayyes/form-handler/internal/contact"
 )
 
-// SMTP sends through a mail server. Returned as a struct: callers hold it
+// provider names this adapter in a DeliveryError.
+const provider = "smtp"
+
+// Sender sends through a mail server. Returned as a struct: callers hold it
 // through the contact.Mailer interface they declared themselves.
-type SMTP struct {
+type Sender struct {
 	Addr     string // host:port
 	Username string
 	Password string
@@ -32,7 +36,7 @@ type SMTP struct {
 // The visitor's address goes in Reply-To, never in From. Sending as them would
 // fail SPF for their domain and get the whole thing filed as spam — the mail is
 // from this service, about them.
-func (s SMTP) Send(ctx context.Context, m contact.Message) error {
+func (s Sender) Send(ctx context.Context, m contact.Message) error {
 	timeout := s.Timeout
 	if timeout == 0 {
 		timeout = 10 * time.Second
@@ -45,21 +49,21 @@ func (s SMTP) Send(ctx context.Context, m contact.Message) error {
 
 	host, _, err := net.SplitHostPort(s.Addr)
 	if err != nil {
-		return fmt.Errorf("smtp address %q: %w", s.Addr, err)
+		return contact.Undeliverable(provider, "config", fmt.Errorf("address %q: %w", s.Addr, err))
 	}
 
 	conn, err := (&net.Dialer{Deadline: deadline}).DialContext(ctx, "tcp", s.Addr)
 	if err != nil {
-		return fmt.Errorf("dial %s: %w", s.Addr, err)
+		return contact.Undeliverable(provider, "dial", err)
 	}
 	defer func() { _ = conn.Close() }()
 	if err := conn.SetDeadline(deadline); err != nil {
-		return fmt.Errorf("set deadline: %w", err)
+		return contact.Undeliverable(provider, "dial", err)
 	}
 
-	client, err := smtp.NewClient(conn, host)
+	client, err := netsmtp.NewClient(conn, host)
 	if err != nil {
-		return fmt.Errorf("smtp handshake: %w", err)
+		return contact.Undeliverable(provider, "handshake", err)
 	}
 	defer func() { _ = client.Close() }()
 
@@ -68,41 +72,41 @@ func (s SMTP) Send(ctx context.Context, m contact.Message) error {
 	// listen in on; refusing plaintext there would mean no mail at all.
 	if ok, _ := client.Extension("STARTTLS"); ok {
 		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			return fmt.Errorf("starttls: %w", err)
+			return contact.Undeliverable(provider, "starttls", err)
 		}
 	}
 
 	if s.Username != "" {
-		if err := client.Auth(smtp.PlainAuth("", s.Username, s.Password, host)); err != nil {
-			return fmt.Errorf("smtp auth: %w", err)
+		if err := client.Auth(netsmtp.PlainAuth("", s.Username, s.Password, host)); err != nil {
+			return contact.Undeliverable(provider, "auth", err)
 		}
 	}
 
 	if err := client.Mail(s.From); err != nil {
-		return fmt.Errorf("mail from: %w", err)
+		return contact.Undeliverable(provider, "mail from", err)
 	}
 	if err := client.Rcpt(s.To); err != nil {
-		return fmt.Errorf("rcpt to: %w", err)
+		return contact.Undeliverable(provider, "rcpt to", err)
 	}
 
 	w, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("data: %w", err)
+		return contact.Undeliverable(provider, "data", err)
 	}
 	if _, err := w.Write([]byte(s.compose(m))); err != nil {
-		return fmt.Errorf("write body: %w", err)
+		return contact.Undeliverable(provider, "write body", err)
 	}
 	if err := w.Close(); err != nil {
-		return fmt.Errorf("close body: %w", err)
+		return contact.Undeliverable(provider, "close body", err)
 	}
 
-	return client.Quit()
+	return contact.Undeliverable(provider, "quit", client.Quit())
 }
 
 // compose builds the message. Headers are encoded rather than interpolated:
 // a name with a non-ASCII character is ordinary, and a name with a newline in
 // it is someone trying to add their own headers.
-func (s SMTP) compose(m contact.Message) string {
+func (s Sender) compose(m contact.Message) string {
 	var b strings.Builder
 	enc := mime.QEncoding
 

@@ -13,7 +13,8 @@ import (
 
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/contact"
-	"github.com/alrayyes/form-handler/internal/mail"
+	"github.com/alrayyes/form-handler/internal/mail/mailgun"
+	"github.com/alrayyes/form-handler/internal/mail/smtp"
 )
 
 // New builds the handler for every configured form.
@@ -29,13 +30,9 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	for _, f := range cfg.Forms {
-		sender := mail.SMTP{
-			Addr:     f.SMTP.Addr,
-			Username: f.SMTP.Username,
-			Password: f.SMTP.Password,
-			From:     f.From,
-			To:       f.To,
-			Timeout:  f.SMTP.Timeout,
+		sender, err := mailerFor(f)
+		if err != nil {
+			return nil, err
 		}
 
 		h, err := contact.NewHandler(contact.Form{
@@ -79,4 +76,40 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// mailerFor builds the adapter one form sends through.
+//
+// This is the whole of the composition root's knowledge about providers: the
+// domain declared the port, each adapter implements it, and the only place that
+// knows both exist is here. Adding a third provider means a case in this switch
+// and a package beside the other two, and nothing in internal/contact changes.
+func mailerFor(f config.Form) (contact.Mailer, error) {
+	switch {
+	case f.Mailgun != nil:
+		return mailgun.New(mailgun.Config{
+			Domain:  f.Mailgun.Domain,
+			APIKey:  f.Mailgun.APIKey,
+			Region:  f.Mailgun.Region,
+			BaseURL: f.Mailgun.BaseURL,
+			From:    f.From,
+			To:      f.To,
+			Timeout: f.Mailgun.Timeout,
+		})
+
+	case f.SMTP != nil:
+		return smtp.Sender{
+			Addr:     f.SMTP.Addr,
+			Username: f.SMTP.Username,
+			Password: f.SMTP.Password,
+			From:     f.From,
+			To:       f.To,
+			Timeout:  f.SMTP.Timeout,
+		}, nil
+
+	default:
+		// config refuses to produce this, so reaching it means the two have
+		// drifted apart rather than that somebody misconfigured something.
+		return nil, fmt.Errorf("form %q: no mail provider configured", f.ID)
+	}
 }

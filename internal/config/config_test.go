@@ -112,7 +112,7 @@ forms:
     origins: ["https://other.example.com"]
     from: site@example.com
     to: other@example.com
-`, "duplicate"},
+`, "more than one form"},
 		// Fail closed. A form nobody may post to is a mistake worth hearing
 		// about at startup, not a form that quietly accepts everybody.
 		"no origins": {`

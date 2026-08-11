@@ -58,7 +58,7 @@ func testConfig(marketingSMTP, careersSMTP string) config.Config {
 				To:               "info@example.com",
 				Subject:          "Contact form: {{ .Name }}",
 				RateLimitPerHour: 100,
-				SMTP:             config.SMTP{Addr: marketingSMTP, Timeout: 10 * time.Second},
+				SMTP:             &config.SMTP{Addr: marketingSMTP, Timeout: 10 * time.Second},
 			},
 			{
 				ID:               "careers",
@@ -67,7 +67,7 @@ func testConfig(marketingSMTP, careersSMTP string) config.Config {
 				To:               "jobs@example.com",
 				Subject:          "Application from {{ .Name }}",
 				RateLimitPerHour: 100,
-				SMTP:             config.SMTP{Addr: careersSMTP, Timeout: 10 * time.Second},
+				SMTP:             &config.SMTP{Addr: careersSMTP, Timeout: 10 * time.Second},
 			},
 		},
 	}
@@ -77,38 +77,38 @@ func testConfig(marketingSMTP, careersSMTP string) config.Config {
 // server, so a message posted at one form cannot turn up on the other's.
 func TestEachFormSendsThroughItsOwnServer(t *testing.T) {
 	ctx := context.Background()
-	marketingSMTP, marketingAPI := startMailpit(t, ctx, 1)
-	careersSMTP, careersAPI := startMailpit(t, ctx, 2)
+	marketingSMTP, marketingAPI := startMailpit(ctx, t, 1)
+	careersSMTP, careersAPI := startMailpit(ctx, t, 2)
 	srv := start(t, testConfig(marketingSMTP, careersSMTP))
 
-	post(t, ctx, srv.URL+"/contact/careers", careersOrigin,
+	post(ctx, t, srv.URL+"/contact/careers", careersOrigin,
 		`{"name":"Grace Hopper","email":"grace@example.com","message":"I would like to apply for the compiler role.","website":""}`,
 		http.StatusAccepted)
 
-	careers := waitForMessageTo(t, ctx, careersAPI, "jobs@example.com")
+	careers := waitForMessageTo(ctx, t, careersAPI, "jobs@example.com")
 	assert.Equal(t, "Application from Grace Hopper", careers.Subject)
 
 	// The marketing server saw nothing, because that form was not posted to.
 	// A shared mailer with a switched recipient would pass every other
 	// assertion in this file and fail this one.
-	assert.Zero(t, messageCount(t, ctx, marketingAPI),
+	assert.Zero(t, messageCount(ctx, t, marketingAPI),
 		"the careers form sent through the marketing server")
 }
 
 func TestEachFormDeliversToItsOwnInbox(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, apiURL := startMailpit(t, ctx, 1)
+	smtpAddr, apiURL := startMailpit(ctx, t, 1)
 	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
-	post(t, ctx, srv.URL+"/contact/marketing", marketingOrigin,
+	post(ctx, t, srv.URL+"/contact/marketing", marketingOrigin,
 		`{"name":"Ada Lovelace","email":"ada@example.com","message":"Please get in touch about an awkward system.","website":""}`,
 		http.StatusAccepted)
-	post(t, ctx, srv.URL+"/contact/careers", careersOrigin,
+	post(ctx, t, srv.URL+"/contact/careers", careersOrigin,
 		`{"name":"Grace Hopper","email":"grace@example.com","message":"I would like to apply for the compiler role.","website":""}`,
 		http.StatusAccepted)
 
-	marketing := waitForMessageTo(t, ctx, apiURL, "info@example.com")
-	careers := waitForMessageTo(t, ctx, apiURL, "jobs@example.com")
+	marketing := waitForMessageTo(ctx, t, apiURL, "info@example.com")
+	careers := waitForMessageTo(ctx, t, apiURL, "jobs@example.com")
 
 	// Each form's own subject template, not one shared line.
 	assert.Equal(t, "Contact form: Ada Lovelace", marketing.Subject)
@@ -130,40 +130,40 @@ func TestEachFormDeliversToItsOwnInbox(t *testing.T) {
 // its own form must not be able to post to somebody else's.
 func TestAFormRefusesAnotherFormsOrigin(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, apiURL := startMailpit(t, ctx, 1)
+	smtpAddr, apiURL := startMailpit(ctx, t, 1)
 	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
-	post(t, ctx, srv.URL+"/contact/marketing", careersOrigin,
+	post(ctx, t, srv.URL+"/contact/marketing", careersOrigin,
 		`{"name":"Ada Lovelace","email":"ada@example.com","message":"Posting this at the wrong form entirely.","website":""}`,
 		http.StatusForbidden)
 
 	time.Sleep(2 * time.Second)
-	assert.Zero(t, messageCount(t, ctx, apiURL), "a refused origin still sent mail")
+	assert.Zero(t, messageCount(ctx, t, apiURL), "a refused origin still sent mail")
 }
 
 func TestAnUnknownFormIsNotFound(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, _ := startMailpit(t, ctx, 1)
+	smtpAddr, _ := startMailpit(ctx, t, 1)
 	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
-	post(t, ctx, srv.URL+"/contact/nonexistent", marketingOrigin,
+	post(ctx, t, srv.URL+"/contact/nonexistent", marketingOrigin,
 		`{"name":"Ada Lovelace","email":"ada@example.com","message":"Nobody is listening at this address.","website":""}`,
 		http.StatusNotFound)
 }
 
 func TestHoneypotIsAcceptedButNotDelivered(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, apiURL := startMailpit(t, ctx, 1)
+	smtpAddr, apiURL := startMailpit(ctx, t, 1)
 	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
 	// Indistinguishable from success, on purpose.
-	post(t, ctx, srv.URL+"/contact/marketing", marketingOrigin,
+	post(ctx, t, srv.URL+"/contact/marketing", marketingOrigin,
 		`{"name":"Bot","email":"bot@example.com","message":"Cheap watches, buy now please.","website":"http://spam.example"}`,
 		http.StatusAccepted)
 
 	// Give it long enough that a delivery would have shown up.
 	time.Sleep(2 * time.Second)
-	assert.Zero(t, messageCount(t, ctx, apiURL), "the honeypot submission was delivered")
+	assert.Zero(t, messageCount(ctx, t, apiURL), "the honeypot submission was delivered")
 }
 
 func TestHealthzAnswersWithoutTouchingSMTP(t *testing.T) {
@@ -190,7 +190,7 @@ func start(t *testing.T, cfg config.Config) *httptest.Server {
 	return srv
 }
 
-func post(t *testing.T, ctx context.Context, url, origin, body string, want int) {
+func post(ctx context.Context, t *testing.T, url, origin, body string, want int) {
 	t.Helper()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(body))
@@ -220,7 +220,7 @@ func post(t *testing.T, ctx context.Context, url, origin, body string, want int)
 // The instance argument is why there are two sets of variables: proving that
 // each form sends through its own server needs two servers, and in CI those
 // are two service containers rather than two containers this test started.
-func startMailpit(t *testing.T, ctx context.Context, instance int) (smtpAddr, apiURL string) {
+func startMailpit(ctx context.Context, t *testing.T, instance int) (smtpAddr, apiURL string) {
 	t.Helper()
 
 	addrVar, apiVar := "MAILPIT_SMTP_ADDR", "MAILPIT_API_URL"
@@ -233,7 +233,7 @@ func startMailpit(t *testing.T, ctx context.Context, instance int) (smtpAddr, ap
 		// One server for the whole run, unlike the container case where each
 		// test gets its own. Empty it first, or a test counts the message the
 		// previous one sent and reports a leak that isn't.
-		deleteAllMessages(t, ctx, api)
+		deleteAllMessages(ctx, t, api)
 		return addr, api
 	}
 
@@ -275,7 +275,7 @@ type mailpitMessage struct {
 // waitForMessageTo finds the message delivered to one recipient. Both forms
 // deliver to the same server, so "the first message" is not good enough — the
 // test has to name which inbox it means.
-func waitForMessageTo(t *testing.T, ctx context.Context, apiURL, recipient string) mailpitMessage {
+func waitForMessageTo(ctx context.Context, t *testing.T, apiURL, recipient string) mailpitMessage {
 	t.Helper()
 
 	var found mailpitMessage
@@ -285,11 +285,11 @@ func waitForMessageTo(t *testing.T, ctx context.Context, apiURL, recipient strin
 				ID string `json:"ID"`
 			} `json:"messages"`
 		}
-		getJSON(t, ctx, apiURL+"/api/v1/messages", &list)
+		getJSON(ctx, t, apiURL+"/api/v1/messages", &list)
 
 		for _, m := range list.Messages {
 			var msg mailpitMessage
-			getJSON(t, ctx, apiURL+"/api/v1/message/"+m.ID, &msg)
+			getJSON(ctx, t, apiURL+"/api/v1/message/"+m.ID, &msg)
 			for _, to := range msg.To {
 				if to.Address == recipient {
 					found = msg
@@ -303,18 +303,18 @@ func waitForMessageTo(t *testing.T, ctx context.Context, apiURL, recipient strin
 	return found
 }
 
-func messageCount(t *testing.T, ctx context.Context, apiURL string) int {
+func messageCount(ctx context.Context, t *testing.T, apiURL string) int {
 	t.Helper()
 	var list struct {
 		Total int `json:"total"`
 	}
-	getJSON(t, ctx, apiURL+"/api/v1/messages", &list)
+	getJSON(ctx, t, apiURL+"/api/v1/messages", &list)
 	return list.Total
 }
 
 // deleteAllMessages empties the mailbox, so a shared Mailpit starts each test
 // as clean as a fresh container would.
-func deleteAllMessages(t *testing.T, ctx context.Context, apiURL string) {
+func deleteAllMessages(ctx context.Context, t *testing.T, apiURL string) {
 	t.Helper()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL+"/api/v1/messages", nil)
@@ -325,7 +325,7 @@ func deleteAllMessages(t *testing.T, ctx context.Context, apiURL string) {
 	require.Equalf(t, http.StatusOK, res.StatusCode, "empty the mailbox")
 }
 
-func getJSON(t *testing.T, ctx context.Context, url string, into any) {
+func getJSON(ctx context.Context, t *testing.T, url string, into any) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	require.NoError(t, err)

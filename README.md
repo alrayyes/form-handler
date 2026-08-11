@@ -193,6 +193,41 @@ form that silently stops sending. Use `password:` inline instead if you mount th
 whole file as a secret and would rather keep it self-contained — setting both is
 an error, because it is a question about which one wins.
 
+### Mailgun instead of SMTP
+
+A form sends through SMTP or through [Mailgun](https://www.mailgun.com), and
+names one or the other — never both. Setting both is refused at startup, because
+it is a question about which one wins and any answer is somebody's surprise.
+
+```yaml
+forms:
+  - id: marketing
+    origins: ["https://www.example.com"]
+    from: postmaster@mg.example.com
+    to: info@example.com
+    mailgun:
+      domain: mg.example.com
+      region: eu
+      api_key_env: MAILGUN_EXAMPLE_COM
+```
+
+`domain` is the sending domain as Mailgun knows it — usually `mg.example.com`
+rather than `example.com`. `region` is `us` (the default) or `eu`; which one you
+get is decided when the domain is created, and sending to the wrong one fails
+authentication rather than redirecting. `api_key_env` follows the same rule as
+the SMTP password: the file names the secret, the deployment supplies it, and an
+unset variable refuses to start.
+
+A top-level `mailgun:` block sets defaults for every form, exactly as `smtp:`
+does — useful when several sending domains share one Mailgun account and only
+`domain` differs.
+
+Forms can disagree about this. One domain on Mailgun and another on a
+self-hosted SMTP bridge is a supported arrangement, not a workaround, and there
+is a test asserting it.
+
+### Which wins
+
 The forms file is the whole story once it exists: `MAIL_FROM`, `MAIL_TO`,
 `ALLOWED_ORIGINS`, `RATE_LIMIT_PER_HOUR` and the `SMTP_*` variables are all
 ignored, because a half-file-half-environment configuration is the kind of thing
@@ -215,16 +250,27 @@ docker run --rm -p 1025:1025 -p 8025:8025 \
 Mailpit's web interface is on <http://localhost:8025>, and anything the service
 sends appears there instead of on the internet.
 
-Two flags, both for asking the binary about itself rather than for running it:
+Three flags, all for asking the binary about itself rather than for running it:
 
 ```sh
-form-handler -version      # the tag it was built from, or "dev"
-form-handler -healthcheck  # probe the local /healthz and exit non-zero if it fails
+form-handler --version      # the tag it was built from, or "dev"
+form-handler --healthcheck  # probe the local /healthz and exit non-zero if it fails
+form-handler --help         # everything it takes, generated from the command
 ```
 
-`-healthcheck` exists because the image is distroless. There is no shell and no
+`--healthcheck` exists because the image is distroless. There is no shell and no
 curl in there for a container healthcheck to run, so the binary has to be able to
 probe itself.
+
+The single-dash spellings — `-version` and `-healthcheck` — still work, and will.
+They are what this took before the arguments were parsed by
+[cobra](https://github.com/spf13/cobra), and a container healthcheck configured
+back then is baked into compose files that are already deployed. pflag would
+otherwise read `-healthcheck` as a cluster of shorthands and refuse it with
+`unknown shorthand flag: 'e' in -ealthcheck`, marking every running container
+unhealthy the moment it pulled a new image. Only those two exact arguments are
+translated, so a mistyped `-nonsence` is still an error rather than something
+quietly promoted into a flag.
 
 ## The endpoint
 
@@ -401,11 +447,11 @@ VERSION=dev KO_DOCKER_REPO=ko.local ko build --bare --local ./
 **The entrypoint is `/ko-app/form-handler`, not `/form-handler`.** ko puts the
 binary under `/ko-app`, so a compose healthcheck that shells the old path will
 fail with "no such file" and the container will sit there unhealthy. Use
-`form-handler -healthcheck` instead; that is what it is for.
+`form-handler --healthcheck` instead; that is what it is for.
 
 Pin the **digest** in your compose file, not the tag. A tag can be moved; a
 digest cannot, which is the difference between knowing what is running and
-assuming it. `form-handler -version` inside the container tells you which release
+assuming it. `form-handler --version` inside the container tells you which release
 a digest is, so pinning a digest no longer means losing the version.
 
 ## Licence

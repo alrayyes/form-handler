@@ -63,7 +63,23 @@ type Form struct {
 	To               string
 	Subject          string
 	RateLimitPerHour int
-	SMTP             SMTP
+
+	// Exactly one of these is set, and which one is how the composition root
+	// knows which adapter to build. A pointer each rather than a provider
+	// string plus two structs, so "configured but for the other provider" is
+	// not a state that can be represented.
+	SMTP    *SMTP
+	Mailgun *Mailgun
+}
+
+// Mailgun is one form's Mailgun credentials. Per form for the same reason SMTP
+// is: a key authenticates one sending domain.
+type Mailgun struct {
+	Domain  string
+	APIKey  string
+	Region  string
+	BaseURL string
+	Timeout time.Duration
 }
 
 // formID is what may appear as the last path segment of the endpoint. Kept
@@ -105,7 +121,7 @@ func formFromEnv() (Form, error) {
 		From:    os.Getenv("MAIL_FROM"),
 		To:      os.Getenv("MAIL_TO"),
 		Subject: contact.DefaultSubject,
-		SMTP: SMTP{
+		SMTP: &SMTP{
 			Addr:     env("SMTP_ADDR", DefaultSMTPAddr),
 			Username: os.Getenv("SMTP_USERNAME"),
 			Password: os.Getenv("SMTP_PASSWORD"),
@@ -170,10 +186,20 @@ func LoadForms(path string) ([]Form, error) {
 // format is something this package can change independently of what the rest of
 // the service passes around.
 type yamlFile struct {
-	// Defaults for every form, so a deployment whose forms share a server does
-	// not repeat it once per form.
-	SMTP  *yamlSMTP  `yaml:"smtp"`
-	Forms []yamlForm `yaml:"forms"`
+	// Defaults for every form, so a deployment whose forms share a server or a
+	// region does not repeat it once per form.
+	SMTP    *yamlSMTP    `yaml:"smtp"`
+	Mailgun *yamlMailgun `yaml:"mailgun"`
+	Forms   []yamlForm   `yaml:"forms"`
+}
+
+type yamlMailgun struct {
+	Domain string `yaml:"domain"`
+	Region string `yaml:"region"`
+	// BaseURL overrides the region outright. Mostly a test seam.
+	BaseURL   string `yaml:"base_url"`
+	APIKey    string `yaml:"api_key"`
+	APIKeyEnv string `yaml:"api_key_env"`
 }
 
 type yamlSMTP struct {
@@ -198,12 +224,14 @@ type yamlForm struct {
 	// Overrides the file-level smtp block, field by field. A provider that
 	// authenticates per sending domain gives each form its own login here.
 	SMTP *yamlSMTP `yaml:"smtp"`
+	// The other way to send. A form names one or the other, never both.
+	Mailgun *yamlMailgun `yaml:"mailgun"`
 }
 
 // resolveSMTP layers a form's SMTP block over the file's defaults, then reads
 // whichever password was named. Field by field, so a form that only overrides
 // the username keeps the shared address.
-func resolveSMTP(defaults, form *yamlSMTP, where string) (SMTP, error) {
+func resolveSMTP(defaults, form *yamlSMTP, where string) (*SMTP, error) {
 	merged := yamlSMTP{}
 	for _, layer := range []*yamlSMTP{defaults, form} {
 		if layer == nil {
@@ -228,13 +256,13 @@ func resolveSMTP(defaults, form *yamlSMTP, where string) (SMTP, error) {
 	// Both set in the same layer is a question about which one wins, and any
 	// answer would be somebody's surprise.
 	if form != nil && form.Password != "" && form.PasswordEnv != "" {
-		return SMTP{}, fmt.Errorf("%s: smtp: set password or password_env, not both", where)
+		return nil, &FormError{Form: where, Field: "smtp", Reason: "set password or password_env, not both"}
 	}
 	if defaults != nil && defaults.Password != "" && defaults.PasswordEnv != "" {
-		return SMTP{}, fmt.Errorf("smtp: set password or password_env, not both")
+		return nil, &FormError{Form: where, Field: "smtp", Reason: "file defaults set password and password_env, not both"}
 	}
 
-	out := SMTP{
+	out := &SMTP{
 		Addr:     merged.Addr,
 		Username: merged.Username,
 		Password: merged.Password,
@@ -250,14 +278,14 @@ func resolveSMTP(defaults, form *yamlSMTP, where string) (SMTP, error) {
 		// the old container is still running.
 		out.Password = os.Getenv(merged.PasswordEnv)
 		if out.Password == "" {
-			return SMTP{}, fmt.Errorf("%s: smtp: %s is empty or unset", where, merged.PasswordEnv)
+			return nil, &MissingSecretError{Form: where, Variable: merged.PasswordEnv}
 		}
 	}
 
 	// Mailgun and friends refuse the session outright, which would otherwise
 	// surface one failed submission at a time.
 	if out.Username != "" && out.Password == "" {
-		return SMTP{}, fmt.Errorf("%s: smtp: username is set but no password is", where)
+		return nil, &FormError{Form: where, Field: "smtp", Reason: "username is set but no password is"}
 	}
 
 	return out, nil
@@ -277,12 +305,9 @@ func ParseForms(r io.Reader) ([]Form, error) {
 
 	forms := make([]Form, 0, len(file.Forms))
 	for i, f := range file.Forms {
-		where := fmt.Sprintf("form %d", i)
-		if f.ID != "" {
-			where = fmt.Sprintf("form %q", f.ID)
-		}
+		where := describe(i, f.ID)
 
-		smtp, err := resolveSMTP(file.SMTP, f.SMTP, where)
+		smtpCfg, mgCfg, err := resolveProvider(&file, f, where)
 		if err != nil {
 			return nil, err
 		}
@@ -294,7 +319,8 @@ func ParseForms(r io.Reader) ([]Form, error) {
 			To:               f.To,
 			Subject:          f.Subject,
 			RateLimitPerHour: DefaultRateLimitPerHour,
-			SMTP:             smtp,
+			SMTP:             smtpCfg,
+			Mailgun:          mgCfg,
 		}
 		if strings.TrimSpace(form.Subject) == "" {
 			form.Subject = contact.DefaultSubject
@@ -311,6 +337,108 @@ func ParseForms(r io.Reader) ([]Form, error) {
 	return forms, nil
 }
 
+// resolveMailgun layers a form's mailgun block over the file's defaults and
+// reads the named key.
+func resolveMailgun(defaults, form *yamlMailgun, where string) (*Mailgun, error) {
+	merged := yamlMailgun{}
+	for _, layer := range []*yamlMailgun{defaults, form} {
+		if layer == nil {
+			continue
+		}
+		if layer.Domain != "" {
+			merged.Domain = layer.Domain
+		}
+		if layer.Region != "" {
+			merged.Region = layer.Region
+		}
+		if layer.BaseURL != "" {
+			merged.BaseURL = layer.BaseURL
+		}
+		if layer.APIKey != "" {
+			merged.APIKey, merged.APIKeyEnv = layer.APIKey, ""
+		}
+		if layer.APIKeyEnv != "" {
+			merged.APIKeyEnv, merged.APIKey = layer.APIKeyEnv, ""
+		}
+	}
+
+	if form != nil && form.APIKey != "" && form.APIKeyEnv != "" {
+		return nil, &FormError{Form: where, Field: "mailgun", Reason: "set api_key or api_key_env, not both"}
+	}
+
+	out := &Mailgun{
+		Domain:  merged.Domain,
+		Region:  merged.Region,
+		BaseURL: merged.BaseURL,
+		APIKey:  merged.APIKey,
+		Timeout: DefaultSMTPTimeout,
+	}
+
+	if merged.APIKeyEnv != "" {
+		// Same reasoning as the SMTP password: a missing secret should be a
+		// failed deploy while the old container is still up, not a form that
+		// quietly stops sending.
+		out.APIKey = os.Getenv(merged.APIKeyEnv)
+		if out.APIKey == "" {
+			return nil, &MissingSecretError{Form: where, Variable: merged.APIKeyEnv}
+		}
+	}
+
+	if strings.TrimSpace(out.Domain) == "" {
+		return nil, &FormError{Form: where, Field: "mailgun", Reason: "domain is required"}
+	}
+	if strings.TrimSpace(out.APIKey) == "" {
+		return nil, &FormError{Form: where, Field: "mailgun", Reason: "api_key or api_key_env is required"}
+	}
+	switch strings.ToLower(out.Region) {
+	case "", "us", "eu":
+	default:
+		return nil, &FormError{Form: where, Field: "mailgun", Reason: fmt.Sprintf("region %q is not \"us\" or \"eu\"", out.Region)}
+	}
+
+	return out, nil
+}
+
+// resolveProvider decides how one form sends, and refuses anything ambiguous.
+//
+// A form names smtp or mailgun, never both — two providers configured on one
+// form is a question about which one wins, and any answer is somebody's
+// surprise. Where a form names neither it inherits whichever the file's
+// defaults describe, and where there are no defaults either it falls back to
+// SMTP on localhost, which is what this service did before it could speak to
+// anything else.
+func resolveProvider(file *yamlFile, form yamlForm, where string) (*SMTP, *Mailgun, error) {
+	switch {
+	case form.SMTP != nil && form.Mailgun != nil:
+		return nil, nil, &FormError{Form: where, Field: "provider", Reason: "set smtp or mailgun, not both"}
+
+	case form.Mailgun != nil:
+		mg, err := resolveMailgun(file.Mailgun, form.Mailgun, where)
+		return nil, mg, err
+
+	case form.SMTP != nil:
+		smtp, err := resolveSMTP(file.SMTP, form.SMTP, where)
+		return smtp, nil, err
+
+	// Neither named on the form: inherit the file's defaults, so a deployment
+	// where every form sends the same way says so once.
+	case file.Mailgun != nil && file.SMTP != nil:
+		return nil, nil, &FormError{
+			Form:   where,
+			Field:  "provider",
+			Reason: "the file sets both smtp and mailgun defaults, so this form must name which it uses",
+		}
+
+	case file.Mailgun != nil:
+		mg, err := resolveMailgun(file.Mailgun, nil, where)
+		return nil, mg, err
+
+	default:
+		smtp, err := resolveSMTP(file.SMTP, nil, where)
+		return smtp, nil, err
+	}
+}
+
 // validate says no at startup to everything that would otherwise go wrong at
 // the first submission, or worse, not go wrong at all and just deliver
 // somewhere nobody is reading.
@@ -321,41 +449,38 @@ func validate(forms []Form) error {
 
 	seen := make(map[string]bool, len(forms))
 	for i, f := range forms {
-		where := fmt.Sprintf("form %d", i)
-		if f.ID != "" {
-			where = fmt.Sprintf("form %q", f.ID)
-		}
+		where := describe(i, f.ID)
 
 		switch {
 		case f.ID == "":
-			return fmt.Errorf("%s: id is required", where)
+			return &FormError{Form: where, Field: "id", Reason: "is required"}
 		case !formID.MatchString(f.ID):
-			return fmt.Errorf("%s: id must match %s", where, formID)
+			return &FormError{Form: where, Field: "id", Reason: "must match " + formID.String()}
 		case seen[f.ID]:
-			return fmt.Errorf("%s: duplicate id", where)
+			return &FormError{Form: where, Field: "id", Reason: "is used by more than one form"}
 		}
 		seen[f.ID] = true
 
 		if len(f.Origins) == 0 {
-			return fmt.Errorf("%s: at least one origin is required", where)
+			return &FormError{Form: where, Field: "origins", Reason: "at least one is required"}
 		}
 		for _, o := range f.Origins {
 			if err := validOrigin(o); err != nil {
-				return fmt.Errorf("%s: origin %q: %w", where, o, err)
+				return &FormError{Form: where, Field: "origins", Reason: fmt.Sprintf("%q: %v", o, err)}
 			}
 		}
 
 		for _, addr := range []struct{ field, value string }{{"from", f.From}, {"to", f.To}} {
 			if strings.TrimSpace(addr.value) == "" {
-				return fmt.Errorf("%s: %s is required", where, addr.field)
+				return &FormError{Form: where, Field: addr.field, Reason: "is required"}
 			}
 			if _, err := mail.ParseAddress(addr.value); err != nil {
-				return fmt.Errorf("%s: %s %q is not a valid address", where, addr.field, addr.value)
+				return &FormError{Form: where, Field: addr.field, Reason: fmt.Sprintf("%q is not a valid address", addr.value)}
 			}
 		}
 
 		if _, err := template.New("subject").Parse(f.Subject); err != nil {
-			return fmt.Errorf("%s: subject template: %w", where, err)
+			return &FormError{Form: where, Field: "subject", Reason: err.Error()}
 		}
 	}
 
@@ -386,4 +511,13 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// describe names a form for an error message: its id where it has one, and its
+// position in the file where the id is the thing that is missing.
+func describe(index int, id string) string {
+	if id != "" {
+		return fmt.Sprintf("%q", id)
+	}
+	return fmt.Sprintf("#%d", index)
 }
