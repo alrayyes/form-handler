@@ -36,6 +36,11 @@ Worth knowing before you go looking, because these are deliberate:
   configured refuses everything rather than accepting everything.
 - **The rate limiter is in memory and forgets on restart.** One instance, one
   job. The worst case is that a restart forgives someone.
+- **The rate limiter counts by client address, and that address is only as
+  trustworthy as `TRUSTED_PROXIES` makes it.** `X-Forwarded-For` is ignored
+  unless the connection came from a proxy listed there, because the header is
+  set by the sender. A deployment that lists a range wider than its actual
+  proxies is back to letting callers pick their own bucket.
 - **Header injection is the interesting attack.** The visitor controls the name
   and the address that reach `Subject` and `Reply-To`, so line breaks are
   stripped before either is written and there is a test asserting it. If you

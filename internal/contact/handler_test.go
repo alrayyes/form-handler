@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
 )
 
@@ -64,7 +65,7 @@ func newHandler(t *testing.T, m contact.Mailer, perHour int) *contact.Handler {
 		ID:          "default",
 		Origins:     []string{origin},
 		RatePerHour: perHour,
-	}, m, slog.New(slog.DiscardHandler))
+	}, m, slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
 	return h
 }
@@ -160,7 +161,7 @@ func TestTheFormsSubjectTemplateIsRendered(t *testing.T) {
 		Origins:     []string{origin},
 		Subject:     "{{ .Form }}: {{ .Name }} <{{ .Email }}>",
 		RatePerHour: 100,
-	}, mailer, slog.New(slog.DiscardHandler))
+	}, mailer, slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
 
 	res := post(t, h, goodBody, origin)
@@ -199,7 +200,7 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 		ID:      "broken",
 		Origins: []string{origin},
 		Subject: "Contact form: {{ .Name",
-	}, &recorder{}, slog.New(slog.DiscardHandler))
+	}, &recorder{}, slog.New(slog.DiscardHandler), clientip.Resolver{})
 
 	require.Error(t, err, "a template that cannot parse was accepted")
 }
@@ -209,13 +210,62 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 func TestAFormWithNoOriginsAcceptsNothing(t *testing.T) {
 	mailer := &recorder{}
 	h, err := contact.NewHandler(contact.Form{ID: "misconfigured", RatePerHour: 100},
-		mailer, slog.New(slog.DiscardHandler))
+		mailer, slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
 
 	res := post(t, h, goodBody, origin)
 
 	require.Equal(t, http.StatusForbidden, res.Code)
 	assert.Zero(t, mailer.count())
+}
+
+// The bug in issue #6. X-Forwarded-For is set by whoever sent the request, so
+// a service that believes it gives every caller a fresh rate-limit bucket per
+// request just by varying the header.
+func TestTheRateLimitCannotBeBypassedWithAForgedHeader(t *testing.T) {
+	mailer := &recorder{}
+	h := newHandler(t, mailer, 1)
+
+	first := postAs(t, h, "198.51.100.1")
+	second := postAs(t, h, "198.51.100.2")
+
+	require.Equal(t, http.StatusAccepted, first.Code)
+	require.Equal(t, http.StatusTooManyRequests, second.Code,
+		"a second submission got its own bucket by claiming a different address")
+	assert.Equal(t, 1, mailer.count())
+}
+
+// And the reason it is read at all still works: a trusted proxy's header is
+// believed, so two real visitors behind one proxy are not one client.
+func TestBehindATrustedProxyVisitorsAreCountedSeparately(t *testing.T) {
+	mailer := &recorder{}
+	resolver, err := clientip.NewResolver([]string{"192.0.2.0/24"})
+	require.NoError(t, err)
+	h, err := contact.NewHandler(contact.Form{
+		ID: "default", Origins: []string{origin}, RatePerHour: 1,
+	}, mailer, slog.New(slog.DiscardHandler), resolver)
+	require.NoError(t, err)
+
+	first := postAs(t, h, "198.51.100.1")
+	second := postAs(t, h, "198.51.100.2")
+
+	require.Equal(t, http.StatusAccepted, first.Code)
+	assert.Equal(t, http.StatusAccepted, second.Code,
+		"two visitors behind one proxy were counted as the same client")
+}
+
+// postAs sends from a fixed connection address while claiming, via
+// X-Forwarded-For, to be somebody else.
+func postAs(t *testing.T, h http.Handler, claimed string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/contact", strings.NewReader(goodBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", origin)
+	req.Header.Set("X-Forwarded-For", claimed)
+	req.RemoteAddr = "192.0.2.10:44321"
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+	return res
 }
 
 func TestGetIsNotAllowed(t *testing.T) {

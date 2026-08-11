@@ -99,17 +99,18 @@ ALLOWED_ORIGINS=https://www.example.com \
   go run .
 ```
 
-| Variable              | Default          | What it does                                                                    |
-| --------------------- | ---------------- | ------------------------------------------------------------------------------- |
-| `MAIL_FROM`           | _required_       | Envelope and header sender. Must be an address the mail server will accept.     |
-| `MAIL_TO`             | _required_       | Where submissions land.                                                         |
-| `ALLOWED_ORIGINS`     | _required_       | Comma-separated. A request from anywhere else is refused.                       |
-| `SMTP_ADDR`           | `localhost:1025` | `host:port` of the mail server.                                                 |
-| `SMTP_USERNAME`       | empty            | Omit for a local bridge that does not authenticate.                             |
-| `SMTP_PASSWORD`       | empty            | Required if `SMTP_USERNAME` is set.                                             |
-| `RATE_LIMIT_PER_HOUR` | `5`              | Submissions per client address. `0` disables it.                                |
-| `FORMS_FILE`          | unset            | Path to a forms file. Setting it replaces the four variables above — see below. |
-| `ADDR`                | `:8080`          | Listen address.                                                                 |
+| Variable              | Default          | What it does                                                                       |
+| --------------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `MAIL_FROM`           | _required_       | Envelope and header sender. Must be an address the mail server will accept.        |
+| `MAIL_TO`             | _required_       | Where submissions land.                                                            |
+| `ALLOWED_ORIGINS`     | _required_       | Comma-separated. A request from anywhere else is refused.                          |
+| `SMTP_ADDR`           | `localhost:1025` | `host:port` of the mail server.                                                    |
+| `SMTP_USERNAME`       | empty            | Omit for a local bridge that does not authenticate.                                |
+| `SMTP_PASSWORD`       | empty            | Required if `SMTP_USERNAME` is set.                                                |
+| `RATE_LIMIT_PER_HOUR` | `5`              | Submissions per client address. `0` disables it.                                   |
+| `FORMS_FILE`          | unset            | Path to a forms file. Setting it replaces the four variables above — see below.    |
+| `TRUSTED_PROXIES`     | unset            | Comma-separated IPs or CIDRs of proxies in front. Unset ignores `X-Forwarded-For`. |
+| `ADDR`                | `:8080`          | Listen address.                                                                    |
 
 That form is called `default`, which is what makes both `/contact` and
 `/contact/default` reach it.
@@ -302,6 +303,32 @@ is automated. Unknown fields are rejected outright.
 `GET /healthz` answers `{"status":"ok"}` and deliberately does not test SMTP: a
 mail server being briefly unreachable is not a reason for an orchestrator to
 restart a process that is answering perfectly well.
+
+## Behind a proxy
+
+Set `TRUSTED_PROXIES` to the addresses or CIDRs of whatever sits in front —
+Traefik, nginx, Cloudflare Tunnel, a load balancer:
+
+```sh
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12
+```
+
+**If you do not, `X-Forwarded-For` is ignored entirely** and the rate limit
+counts by the address that actually connected. Behind a proxy that means every
+visitor looks like the proxy, so the whole internet shares one bucket and the
+first five submissions an hour are the only ones that get through.
+
+The reason it is not simply believed is that the header is set by whoever sent
+the request. Trusting it unconditionally means anyone can send a different
+address on every request and get a fresh bucket each time, which is a rate limit
+that stops accidents and nothing else. So it is believed exactly as far as the
+proxies that added it are trusted: the address used is the rightmost entry in
+the chain that is not itself one of yours, and the header is ignored outright
+when the connection did not come from a trusted proxy.
+
+Cloudflare's ranges are published and change; if you proxy through it, take them
+from <https://www.cloudflare.com/ips/> rather than copying a list from here that
+will be wrong by the time you read it.
 
 ## Logs
 

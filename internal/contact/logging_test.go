@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
 )
 
@@ -30,7 +31,7 @@ func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
 		ID:          "marketing",
 		Origins:     []string{origin},
 		RatePerHour: perHour,
-	}, &recorder{}, slog.New(slog.NewJSONHandler(&buf, nil)))
+	}, &recorder{}, slog.New(slog.NewJSONHandler(&buf, nil)), clientip.Resolver{})
 	require.NoError(t, err)
 
 	return h, func() []logged {
