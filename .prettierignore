@@ -1,0 +1,11 @@
+# Prettier is here for Markdown and nothing else. Everything below is either
+# somebody else's file or a format Prettier has no business reformatting, and
+# listing them stops its presence being mistaken for permission to touch them.
+node_modules/
+.bun-cache/
+dist/
+bun.lock
+go.sum
+
+# Written by the release job, not by hand.
+CHANGELOG.md

@@ -1,25 +1,52 @@
-# Same commands CI runs, so the two cannot drift.
+# The same commands CI runs, so the two cannot drift. The hook catches it
+# early; CI is the gate that cannot be skipped.
+
+# pre-commit may write. Let every fixer run and restage what it touched — a
+# commit should not fail over a quote style a tool can settle by itself.
 pre-commit:
-  commands:
-    fmt:
+  jobs:
+    - name: gofmt
       glob: "*.go"
-      run: gofmt -l {staged_files} | (! grep .)
-    lint:
+      run: gofmt -w {staged_files}
+      stage_fixed: true
+
+    - name: golangci-lint
       glob: "*.go"
       run: golangci-lint run ./...
-    markdown:
+
+    # Prettier decides the layout, markdownlint then judges what Prettier
+    # produced. The other order has markdownlint fixing something Prettier is
+    # about to overwrite.
+    - name: prettier
+      glob: "*.md"
+      run: bunx prettier --write {staged_files}
+      stage_fixed: true
+
+    - name: markdownlint
       glob: "*.md"
       run: bunx markdownlint-cli2 {staged_files}
 
 commit-msg:
-  commands:
+  jobs:
     # Resolved from node_modules rather than fetched by bunx: commitlint has to
     # load the config its own config extends, and bunx cannot resolve a sibling
     # package for it. Run `bun install` if this cannot find itself.
-    commitlint:
+    - name: commitlint
       run: bunx commitlint --edit {1}
 
+# pre-push never writes. A hook rewriting files under a push leaves the pushed
+# commit and the working tree disagreeing about what was reviewed.
 pre-push:
-  commands:
-    test:
+  jobs:
+    - name: test
       run: go test ./...
+
+    - name: prettier
+      run: bunx prettier --check "**/*.md"
+
+    - name: markdownlint
+      run: bunx markdownlint-cli2
+
+    # The integration test is not here on purpose: it wants a Docker daemon and
+    # takes the better part of a minute, which is more than a push should cost.
+    # CI runs it on every branch.

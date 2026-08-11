@@ -6,6 +6,10 @@ globs:
 
 ignores:
   - CHANGELOG.md # written by the release job, not by hand
+  # The Contributor Covenant, verbatim. Vendored prose belongs to whoever wrote
+  # it — rewrapping it to satisfy a line length here would be editing somebody
+  # else's document and would make the diff against upstream useless.
+  - CODE_OF_CONDUCT.md
   # Other people's READMEs, held to other people's rules. Both of these are
   # gitignored, but a glob does not know that: node_modules is where the linters
   # themselves live, and .bun-cache is where CI puts bun's cache, because GitHub
@@ -14,6 +18,11 @@ ignores:
   - "**/.bun-cache/**"
 
 config:
+  # A pull request template has no title of its own — GitHub drops it into a
+  # body that already has one, so demanding a top-level heading here would mean
+  # writing a heading that renders in the wrong place.
+  MD041: false
+
   MD013:
     # Prose stays at 80 so the diff of a reworded paragraph is the paragraph.
     line_length: 80
