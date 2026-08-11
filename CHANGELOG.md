@@ -11,6 +11,15 @@ alone.
 
 <!-- releases below -->
 
+## v1.1.0
+
+### Features
+* 39fe69a089a5b17f2d50986968cdf0e6e2d46dcf feat: give every form its own mail server login
+### Fixes
+* 8e46e2f8aa2b41354a47a57749d4211f2598364f fix(ci): give the changelog commit a key it can push with
+### Everything else
+* f6b036b659d4cf617aac6995a796edea9567b2de docs: record v1.0.0 in the changelog, and drop a retired badge
+
 ## v1.0.0
 
 ### Features
