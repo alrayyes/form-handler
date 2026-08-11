@@ -38,6 +38,12 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Install svu
+        # GOTOOLCHAIN=auto for this step alone. setup-go pins the toolchain to
+        # what go.mod asks for and svu needs a newer one to build; letting it
+        # fetch that toolchain keeps the tool working without raising the
+        # minimum Go this service actually requires.
+        env:
+          GOTOOLCHAIN: auto
         run: go install github.com/caarlos0/svu/v3@v3.4.1
       - id: decide
         env:
