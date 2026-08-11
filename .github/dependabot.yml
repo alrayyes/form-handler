@@ -1,0 +1,63 @@
+# Dependabot raises the pull request; CI decides whether it lands. Everything
+# here is pinned to an exact version, which is the whole reason this works —
+# a floating range drifts silently and there is nothing to raise a pull request
+# about.
+#
+# Two pins Dependabot cannot see, and which are updated by hand: the distroless
+# base image in .ko.yaml, and the Mailpit image the integration test uses. Both
+# are digest-pinned and neither lives anywhere Dependabot's ecosystems look.
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Amsterdam
+    open-pull-requests-limit: 10
+    commit-message:
+      # Conventional Commits, because commitlint checks these messages and the
+      # version number is computed from them. chore: releases nothing, which is
+      # right for a dependency bump that changed no behaviour.
+      prefix: chore
+      include: scope
+    groups:
+      # One pull request rather than thirty. The testcontainers tree alone
+      # pulls in most of Docker's Go packages as indirect dependencies.
+      go-dependencies:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Amsterdam
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # Nothing here is JavaScript. package.json exists so commitlint can resolve
+  # the shared config it extends, which bunx alone cannot do.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Amsterdam
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      tooling:
+        patterns: ["*"]
+        update-types: [minor, patch]
