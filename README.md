@@ -218,13 +218,24 @@ sends appears there instead of on the internet.
 Two flags, both for asking the binary about itself rather than for running it:
 
 ```sh
-form-handler -version      # the tag it was built from, or "dev"
-form-handler -healthcheck  # probe the local /healthz and exit non-zero if it fails
+form-handler --version      # the tag it was built from, or "dev"
+form-handler --healthcheck  # probe the local /healthz and exit non-zero if it fails
+form-handler --help         # everything it takes, generated from the command
 ```
 
-`-healthcheck` exists because the image is distroless. There is no shell and no
+`--healthcheck` exists because the image is distroless. There is no shell and no
 curl in there for a container healthcheck to run, so the binary has to be able to
 probe itself.
+
+The single-dash spellings — `-version` and `-healthcheck` — still work, and will.
+They are what this took before the arguments were parsed by
+[cobra](https://github.com/spf13/cobra), and a container healthcheck configured
+back then is baked into compose files that are already deployed. pflag would
+otherwise read `-healthcheck` as a cluster of shorthands and refuse it with
+`unknown shorthand flag: 'e' in -ealthcheck`, marking every running container
+unhealthy the moment it pulled a new image. Only those two exact arguments are
+translated, so a mistyped `-nonsence` is still an error rather than something
+quietly promoted into a flag.
 
 ## The endpoint
 
@@ -401,11 +412,11 @@ VERSION=dev KO_DOCKER_REPO=ko.local ko build --bare --local ./
 **The entrypoint is `/ko-app/form-handler`, not `/form-handler`.** ko puts the
 binary under `/ko-app`, so a compose healthcheck that shells the old path will
 fail with "no such file" and the container will sit there unhealthy. Use
-`form-handler -healthcheck` instead; that is what it is for.
+`form-handler --healthcheck` instead; that is what it is for.
 
 Pin the **digest** in your compose file, not the tag. A tag can be moved; a
 digest cannot, which is the difference between knowing what is running and
-assuming it. `form-handler -version` inside the container tells you which release
+assuming it. `form-handler --version` inside the container tells you which release
 a digest is, so pinning a digest no longer means losing the version.
 
 ## Licence

@@ -12,15 +12,18 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/server"
@@ -32,32 +35,99 @@ import (
 var version = "dev"
 
 func main() {
+	os.Exit(cli(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// cli parses args and does what they ask, returning the process exit code. It
+// exists as a seam: main() may not return, so everything worth asserting on
+// lives here instead.
+func cli(args []string, stdout, stderr io.Writer) int {
+	cmd := newRootCommand(stdout)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs(legacySingleDash(args))
+
+	if err := cmd.Execute(); err != nil {
+		// Nothing useful to do if even stderr will not take it.
+		_, _ = fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	return 0
+}
+
+// legacyFlags are the two the standard library's flag package accepted behind a
+// single dash, before this command was parsed by pflag.
+var legacyFlags = []string{"-healthcheck", "-version"}
+
+// legacySingleDash rewrites those two into the double-dash form pflag needs.
+//
+// It is a compatibility shim rather than a nicety. `flag` treats a single dash
+// and a double dash alike, so `-healthcheck` is what the README documented and,
+// more to the point, what the healthcheck baked into already-deployed compose
+// files runs. pflag reads a single dash as a cluster of shorthands instead, and
+// the first letter of `-healthcheck` is `h` — help. Without this, a container
+// probing itself prints usage, exits 0 and reports healthy no matter what the
+// service is doing.
+//
+// Only these two exact arguments are rewritten. Anything else keeps its
+// meaning, so `-nonsense` is still an error rather than being promoted into a
+// long flag nobody defined.
+func legacySingleDash(args []string) []string {
+	out := make([]string, len(args))
+	copy(out, args)
+	for i, arg := range out {
+		if slices.Contains(legacyFlags, arg) {
+			out[i] = "-" + arg
+		}
+	}
+	return out
+}
+
+func newRootCommand(stdout io.Writer) *cobra.Command {
+	var healthcheck bool
+
+	cmd := &cobra.Command{
+		Use:   "form-handler",
+		Short: "Turn contact form submissions into email",
+		Long: "Accepts contact form submissions over HTTP and emails them on.\n\n" +
+			"Configured from the environment, or from a forms file when FORMS_FILE\n" +
+			"is set. See the README for the variables it reads.",
+		Args: cobra.NoArgs,
+		// A failure from run() is not a usage error, and printing the whole
+		// usage block after "could not reach the mail server" buries it. cli()
+		// prints the error itself.
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Version:       version,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			log := slog.New(slog.NewJSONHandler(stdout, nil))
+
+			if healthcheck {
+				if err := probe(); err != nil {
+					log.Error("healthcheck failed", "error", err)
+					return err
+				}
+				return nil
+			}
+
+			if err := run(log); err != nil {
+				log.Error("exiting", "error", err)
+				return err
+			}
+			return nil
+		},
+	}
+
 	// -healthcheck exists because the image is distroless: there is no shell,
 	// no wget and no curl for a container healthcheck to run. The binary is the
 	// only executable in there, so it has to be able to probe itself.
-	healthcheck := flag.Bool("healthcheck", false, "probe the local /healthz and exit")
-	showVersion := flag.Bool("version", false, "print the version and exit")
-	flag.Parse()
+	cmd.Flags().BoolVar(&healthcheck, "healthcheck", false, "probe the local /healthz and exit")
+	// Bare version output, not cobra's "form-handler version X" sentence: it is
+	// documented as the way to ask a running container which release its digest
+	// is, so something may well be reading it.
+	cmd.SetVersionTemplate("{{.Version}}\n")
 
-	if *showVersion {
-		fmt.Println(version)
-		return
-	}
-
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
-	if *healthcheck {
-		if err := probe(); err != nil {
-			log.Error("healthcheck failed", "error", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	if err := run(log); err != nil {
-		log.Error("exiting", "error", err)
-		os.Exit(1)
-	}
+	return cmd
 }
 
 // probe asks the running process whether it is serving. Talks to itself over
