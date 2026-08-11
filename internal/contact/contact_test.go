@@ -25,7 +25,10 @@ func TestValidateAcceptsAGoodSubmission(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "ada@example.com", msg.Email)
-	assert.Equal(t, "Contact form: Ada Lovelace", msg.Subject)
+	assert.Equal(t, "Ada Lovelace", msg.Name)
+	// The subject belongs to the form that was posted to, so the Handler fills
+	// it in rather than Validate.
+	assert.Empty(t, msg.Subject)
 }
 
 func TestValidateTrimsBeforeMeasuring(t *testing.T) {
@@ -88,15 +91,4 @@ func TestValidateCatchesTheHoneypot(t *testing.T) {
 	_, err := contact.Validate(s)
 
 	require.ErrorIs(t, err, contact.ErrSpam)
-}
-
-func TestSubjectCannotCarryAHeaderInjection(t *testing.T) {
-	s := valid()
-	s.Name = "Ada\r\nBcc: everyone@example.com"
-
-	msg, err := contact.Validate(s)
-
-	require.NoError(t, err)
-	assert.NotContains(t, msg.Subject, "\r")
-	assert.NotContains(t, msg.Subject, "\n")
 }

@@ -5,34 +5,81 @@ package contact
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 )
 
-// Handler serves the contact endpoint.
+// Handler serves one form's endpoint. One per configured form, each with its
+// own origins, its own subject line, its own rate limit and its own Mailer —
+// which is what keeps two forms on one service from leaking into each other.
 type Handler struct {
+	form    Form
 	mailer  Mailer
 	log     *slog.Logger
 	origins map[string]bool
+	subject *template.Template
 	limiter *limiter
 }
 
-// NewHandler wires a handler. Origins are the sites allowed to post here; a
-// browser will not send the form from anywhere else once this is set, and
-// anything that is not a browser was never going to respect CORS anyway — so
-// this is about keeping other people's pages from using our mailbox, not about
-// authentication.
-func NewHandler(m Mailer, log *slog.Logger, allowedOrigins []string, perHour int) *Handler {
-	origins := make(map[string]bool, len(allowedOrigins))
-	for _, o := range allowedOrigins {
+// subjectData is what a subject template is rendered against. Deliberately not
+// the whole Message: the body has no business in a header.
+type subjectData struct {
+	Name  string
+	Email string
+	Form  string
+}
+
+// NewHandler wires a handler for one form.
+//
+// Origins are the sites allowed to post here; a browser will not send the form
+// from anywhere else once this is set, and anything that is not a browser was
+// never going to respect CORS anyway — so this is about keeping other people's
+// pages from using our mailbox, not about authentication.
+//
+// It returns an error rather than panicking on a bad subject template, because
+// that template comes from a config file a person edits, and the useful moment
+// to hear about a typo in it is at startup.
+func NewHandler(f Form, m Mailer, log *slog.Logger) (*Handler, error) {
+	origins := make(map[string]bool, len(f.Origins))
+	for _, o := range f.Origins {
 		if o = strings.TrimSpace(o); o != "" {
 			origins[o] = true
 		}
 	}
-	return &Handler{mailer: m, log: log, origins: origins, limiter: newLimiter(perHour, time.Hour)}
+
+	pattern := f.Subject
+	if strings.TrimSpace(pattern) == "" {
+		pattern = DefaultSubject
+	}
+	subject, err := template.New("subject").Parse(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("form %q: subject template: %w", f.ID, err)
+	}
+
+	return &Handler{
+		form:    f,
+		mailer:  m,
+		log:     log,
+		origins: origins,
+		subject: subject,
+		limiter: newLimiter(f.RatePerHour, time.Hour),
+	}, nil
+}
+
+// subjectFor renders the form's subject template. Line breaks come out, because
+// the name feeding it is attacker-controlled and a newline in a header is how
+// injection works.
+func (h *Handler) subjectFor(m Message) (string, error) {
+	var b strings.Builder
+	if err := h.subject.Execute(&b, subjectData{Name: m.Name, Email: m.Email, Form: h.form.ID}); err != nil {
+		return "", fmt.Errorf("render subject: %w", err)
+	}
+	return stripBreaks(b.String()), nil
 }
 
 type errorBody struct {
@@ -65,7 +112,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// A browser that was refused the CORS header above would never see the
 	// response anyway, but the request still arrived and would still send mail.
 	// Refusing it here is what actually stops another site posting to us.
-	if len(h.origins) > 0 && !h.origins[origin] {
+	//
+	// Fail closed: a form with no origins configured accepts nothing. An empty
+	// list is a misconfiguration, and the safe reading of "nobody is allowed"
+	// is not "everybody is".
+	if !h.origins[origin] {
 		writeJSON(w, http.StatusForbidden, errorBody{Error: "origin not allowed"})
 		return
 	}
@@ -90,7 +141,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, ErrSpam):
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
-		h.log.Info("dropped submission", "reason", "honeypot", "ip", clientIP(r))
+		h.log.Info("dropped submission", "reason", "honeypot", "form", h.form.ID, "ip", clientIP(r))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
 	case err != nil:
@@ -105,15 +156,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if msg.Subject, err = h.subjectFor(msg); err != nil {
+		h.log.Error("could not build subject", "form", h.form.ID, "error", err)
+		writeJSON(w, http.StatusInternalServerError, errorBody{Error: "could not send message"})
+		return
+	}
+
 	if err := h.mailer.Send(r.Context(), msg); err != nil {
 		// The sender's address is theirs, not ours to log in full on a failure
 		// path that gets read by whoever is on call.
-		h.log.Error("could not send message", "error", err)
+		h.log.Error("could not send message", "form", h.form.ID, "error", err)
 		writeJSON(w, http.StatusBadGateway, errorBody{Error: "could not send message"})
 		return
 	}
 
-	h.log.Info("sent message", "from", msg.Email)
+	h.log.Info("sent message", "form", h.form.ID, "from", msg.Email)
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 }
 

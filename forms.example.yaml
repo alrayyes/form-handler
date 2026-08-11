@@ -1,0 +1,48 @@
+# Every form this service answers for. Copy it somewhere, edit it, and point
+# FORMS_FILE at the copy.
+#
+# One endpoint per form: the id below is the last path segment, so the first
+# form here is served at POST /contact/marketing. A form called "default" also
+# answers at plain /contact.
+#
+# Without a FORMS_FILE the service falls back to a single form built from
+# MAIL_FROM, MAIL_TO and ALLOWED_ORIGINS, which is what a one-site deployment
+# wants and what this service did before it could hold more than one.
+#
+# The mail server itself is not in here. SMTP_ADDR, SMTP_USERNAME and
+# SMTP_PASSWORD stay in the environment, because a password does not belong in
+# a file that wants to be committed next to the site it serves.
+
+forms:
+  - id: marketing
+    # Who may post. Checked server-side, not just answered with a CORS header —
+    # a refused header stops a browser reading the response, but the request
+    # already arrived and would already have sent mail.
+    #
+    # scheme://host[:port] and nothing after it, which is all a browser ever
+    # sends in an Origin header. www and the bare domain are different origins.
+    origins:
+      - https://www.example.com
+      - https://example.com
+    # Never the visitor's address. Sending as them fails SPF for their domain
+    # and files the whole thing as spam; their address goes in Reply-To, so
+    # hitting reply still reaches them.
+    from: site@example.com
+    to: info@example.com
+    # A Go text/template over .Name, .Email and .Form. Optional — leaving it out
+    # gets "Contact form: {{ .Name }}". Line breaks are stripped from the result,
+    # because the name feeding it is whatever the visitor typed.
+    subject: "Contact form: {{ .Name }}"
+    # Submissions per client address per hour. Optional, defaults to 5. An
+    # explicit 0 turns the limit off, which is not the same as leaving it out.
+    rate_limit_per_hour: 5
+
+  # A second form, on a different domain, landing in a different inbox. This is
+  # the reason the service holds more than one: careers mail should not arrive
+  # in the marketing inbox because both forms happened to share a service.
+  - id: careers
+    origins:
+      - https://careers.example.org
+    from: site@example.com
+    to: jobs@example.com
+    subject: "Application from {{ .Name }}"

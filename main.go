@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Command form-handler accepts the andthensome.nl contact form and emails it on.
+// Command form-handler accepts contact form submissions and emails them on.
 //
-// Cloudflare Workers can send mail through an HTTP email API but cannot open an
-// SMTP connection, and the mail for this domain is self-hosted. So this is a
-// small service rather than a function at the edge.
+// It was written for the contact form on andthensome.nl, because Cloudflare
+// Workers can send mail through an HTTP email API but cannot open an SMTP
+// connection, and the mail for that domain is self-hosted. It serves any number
+// of forms across any number of sites: one endpoint per form, each with its own
+// allowed origins and its own recipient.
 package main
 
 import (
@@ -17,17 +19,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/alrayyes/form-handler/internal/contact"
-	"github.com/alrayyes/form-handler/internal/mail"
+	"github.com/alrayyes/form-handler/internal/config"
+	"github.com/alrayyes/form-handler/internal/server"
 )
 
-// version is stamped in at build time — by goreleaser from the tag, and by the
-// Dockerfile from its VERSION build argument. "dev" is what you get from a plain
+// version is stamped in at build time — by goreleaser from the tag, and by ko
+// from its VERSION environment variable. "dev" is what you get from a plain
 // `go build`, which is the honest answer for a binary built off an unknown tree.
 var version = "dev"
 
@@ -63,14 +63,19 @@ func main() {
 // probe asks the running process whether it is serving. Talks to itself over
 // the loopback rather than the configured ADDR, which may be a wildcard bind.
 func probe() error {
-	addr := env("ADDR", ":8080")
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		addr = config.DefaultAddr
+	}
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return fmt.Errorf("ADDR %q: %w", addr, err)
 	}
 
 	client := &http.Client{Timeout: 3 * time.Second}
-	res, err := client.Get("http://127.0.0.1:" + port + "/healthz")
+	// The host is fixed to loopback and only the port is interpolated, from
+	// this service's own ADDR rather than from anything a request carries.
+	res, err := client.Get("http://127.0.0.1:" + port + "/healthz") //nolint:gosec // G704: loopback only, port from own config
 	if err != nil {
 		return err
 	}
@@ -83,43 +88,19 @@ func probe() error {
 }
 
 func run(log *slog.Logger) error {
-	// Everything is wired here and passed explicitly. The service is one
-	// handler and one sender; a container would be more ceremony than code.
-	sender := mail.SMTP{
-		Addr:     env("SMTP_ADDR", "localhost:1025"),
-		Username: os.Getenv("SMTP_USERNAME"),
-		Password: os.Getenv("SMTP_PASSWORD"),
-		From:     env("MAIL_FROM", ""),
-		To:       env("MAIL_TO", ""),
-		Timeout:  10 * time.Second,
-	}
-
-	for name, value := range map[string]string{"MAIL_FROM": sender.From, "MAIL_TO": sender.To} {
-		if value == "" {
-			return errors.New(name + " is required")
-		}
-	}
-
-	origins := strings.Split(env("ALLOWED_ORIGINS", "https://www.andthensome.nl"), ",")
-	perHour, err := strconv.Atoi(env("RATE_LIMIT_PER_HOUR", "5"))
+	cfg, err := config.Load()
 	if err != nil {
-		return errors.New("RATE_LIMIT_PER_HOUR must be a number")
+		return err
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/contact", contact.NewHandler(sender, log, origins, perHour))
-	// Liveness only. It deliberately does not test SMTP: a mail server being
-	// briefly unreachable is not a reason for the orchestrator to kill and
-	// restart a process that is otherwise answering.
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	handler, err := server.New(cfg, log)
+	if err != nil {
+		return err
+	}
 
-	addr := env("ADDR", ":8080")
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:    cfg.Addr,
+		Handler: handler,
 		// A public endpoint with no read timeout is a slow-loris waiting to
 		// happen: a handful of sockets dribbling headers holds the server open.
 		ReadHeaderTimeout: 5 * time.Second,
@@ -133,7 +114,12 @@ func run(log *slog.Logger) error {
 
 	errs := make(chan error, 1)
 	go func() {
-		log.Info("listening", "version", version, "addr", addr, "origins", origins)
+		ids := make([]string, 0, len(cfg.Forms))
+		for _, f := range cfg.Forms {
+			ids = append(ids, f.ID)
+		}
+		log.Info("listening", "version", version, "addr", cfg.Addr, "forms", ids)
+
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errs <- err
 		}
@@ -150,11 +136,4 @@ func run(log *slog.Logger) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
-}
-
-func env(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

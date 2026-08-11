@@ -10,10 +10,14 @@ import (
 )
 
 // The ordinary path: an untrusted Submission goes in, a Message that has been
-// through validation comes out, and the subject is built for you.
+// through validation comes out, trimmed and with the address parsed.
+//
+// The subject is not filled in here. It belongs to the form that was posted to
+// — two forms on one service word it differently — so the Handler renders it
+// from that form's template.
 func ExampleValidate() {
 	msg, err := contact.Validate(contact.Submission{
-		Name:    "Ada Lovelace",
+		Name:    "  Ada Lovelace  ",
 		Email:   "ada@example.com",
 		Message: "Please get in touch about an awkward system.",
 	})
@@ -22,11 +26,13 @@ func ExampleValidate() {
 		return
 	}
 
-	fmt.Println(msg.Subject)
+	fmt.Printf("%q\n", msg.Name)
 	fmt.Println(msg.Email)
+	fmt.Printf("subject: %q\n", msg.Subject)
 	// Output:
-	// Contact form: Ada Lovelace
+	// "Ada Lovelace"
 	// ada@example.com
+	// subject: ""
 }
 
 // A caught bot is an error, but not one to show anyone: answer it exactly as

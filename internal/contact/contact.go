@@ -22,12 +22,39 @@ type Mailer interface {
 
 // Message is what actually gets delivered. Separate from Submission on purpose:
 // a submission is untrusted input, a message has been through Validate.
+//
+// Subject is left empty by Validate and filled in by the Handler, because the
+// subject line belongs to the form that was posted to rather than to the
+// submission: two forms on the same service word it differently.
 type Message struct {
 	Name    string
 	Email   string
 	Subject string
 	Body    string
 }
+
+// Form is one configured form, in the terms this package needs: who may post to
+// it, how often, and what the resulting subject line says. Where the mail goes
+// is not here — that belongs to the Mailer the form is wired to, so a form and
+// its destination are chosen together at the composition root.
+type Form struct {
+	// ID is the last path segment of the endpoint, so it has to survive being
+	// in a URL. Validated by whatever builds the Form.
+	ID string
+	// Origins are the sites allowed to post to this form. Per form rather than
+	// global: one site being allowed to use its own form must not let it use
+	// somebody else's.
+	Origins []string
+	// Subject is a text/template rendered with .Name, .Email and .Form. Empty
+	// means DefaultSubject.
+	Subject string
+	// RatePerHour is submissions allowed per client address per hour. Zero
+	// disables the limit.
+	RatePerHour int
+}
+
+// DefaultSubject is what a form that does not name a subject template gets.
+const DefaultSubject = "Contact form: {{ .Name }}"
 
 // Submission is the raw form, exactly as posted.
 type Submission struct {
@@ -109,22 +136,20 @@ func Validate(s Submission) (Message, error) {
 	}
 
 	return Message{
-		Name:    name,
-		Email:   addr.Address,
-		Subject: subjectFor(name),
-		Body:    body,
+		Name:  name,
+		Email: addr.Address,
+		Body:  body,
 	}, nil
 }
 
-// subjectFor builds the subject line. The name is stripped of anything that
-// could break out of the header — a newline in a subject is how header
-// injection works, and the name is attacker-controlled.
-func subjectFor(name string) string {
-	clean := strings.Map(func(r rune) rune {
+// stripBreaks removes anything that could break out of a header. A newline in a
+// subject is how header injection works, and the name it is built from is
+// attacker-controlled.
+func stripBreaks(v string) string {
+	return strings.Map(func(r rune) rune {
 		if r == '\r' || r == '\n' {
 			return -1
 		}
 		return r
-	}, name)
-	return "Contact form: " + clean
+	}, v)
 }
