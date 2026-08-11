@@ -68,3 +68,26 @@ forms:
       addr: smtp.mailgun.org:587
       username: postmaster@mg.example.org
       password_env: MAILGUN_EXAMPLE_ORG
+
+# ---------------------------------------------------------------------------
+# Mailgun instead of SMTP
+#
+# A form names one provider or the other, never both. Mailgun authenticates per
+# sending domain, so this is the same story as the SMTP logins above told over
+# HTTP: one account per domain, one form per account.
+#
+#   mailgun:
+#     # As Mailgun knows it, which is usually mg.example.com rather than
+#     # example.com.
+#     domain: mg.example.com
+#     # us (the default) or eu. Which one you get is decided when the domain is
+#     # created, and sending to the wrong one fails authentication rather than
+#     # redirecting — a confusing way to spend an afternoon.
+#     region: eu
+#     # Same rule as the SMTP password: the file names the secret, the
+#     # deployment supplies it. An unset variable refuses to start.
+#     api_key_env: MAILGUN_EXAMPLE_COM
+#
+# A top-level `mailgun:` block sets defaults for every form, exactly as the
+# `smtp:` block above does — useful when several domains live in one Mailgun
+# account and only the sending domain differs.

@@ -193,6 +193,41 @@ form that silently stops sending. Use `password:` inline instead if you mount th
 whole file as a secret and would rather keep it self-contained — setting both is
 an error, because it is a question about which one wins.
 
+### Mailgun instead of SMTP
+
+A form sends through SMTP or through [Mailgun](https://www.mailgun.com), and
+names one or the other — never both. Setting both is refused at startup, because
+it is a question about which one wins and any answer is somebody's surprise.
+
+```yaml
+forms:
+  - id: marketing
+    origins: ["https://www.example.com"]
+    from: postmaster@mg.example.com
+    to: info@example.com
+    mailgun:
+      domain: mg.example.com
+      region: eu
+      api_key_env: MAILGUN_EXAMPLE_COM
+```
+
+`domain` is the sending domain as Mailgun knows it — usually `mg.example.com`
+rather than `example.com`. `region` is `us` (the default) or `eu`; which one you
+get is decided when the domain is created, and sending to the wrong one fails
+authentication rather than redirecting. `api_key_env` follows the same rule as
+the SMTP password: the file names the secret, the deployment supplies it, and an
+unset variable refuses to start.
+
+A top-level `mailgun:` block sets defaults for every form, exactly as `smtp:`
+does — useful when several sending domains share one Mailgun account and only
+`domain` differs.
+
+Forms can disagree about this. One domain on Mailgun and another on a
+self-hosted SMTP bridge is a supported arrangement, not a workaround, and there
+is a test asserting it.
+
+### Which wins
+
 The forms file is the whole story once it exists: `MAIL_FROM`, `MAIL_TO`,
 `ALLOWED_ORIGINS`, `RATE_LIMIT_PER_HOUR` and the `SMTP_*` variables are all
 ignored, because a half-file-half-environment configuration is the kind of thing
