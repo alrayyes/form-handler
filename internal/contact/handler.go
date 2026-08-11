@@ -7,11 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/alrayyes/form-handler/internal/logsafe"
 )
 
 // Handler serves one form's endpoint. One per configured form, each with its
@@ -105,7 +109,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST, OPTIONS")
-		writeJSON(w, http.StatusMethodNotAllowed, errorBody{Error: "method not allowed"})
+		h.refuse(w, r, http.StatusMethodNotAllowed, errorBody{Error: "method not allowed"}, "method", r.Method)
 		return
 	}
 
@@ -117,12 +121,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// list is a misconfiguration, and the safe reading of "nobody is allowed"
 	// is not "everybody is".
 	if !h.origins[origin] {
-		writeJSON(w, http.StatusForbidden, errorBody{Error: "origin not allowed"})
+		h.refuse(w, r, http.StatusForbidden, errorBody{Error: "origin not allowed"})
 		return
 	}
 
 	if !h.limiter.allow(clientIP(r)) {
-		writeJSON(w, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
+		h.refuse(w, r, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
 		return
 	}
 
@@ -132,7 +136,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&sub); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorBody{Error: "could not read submission"})
+		// The decoder's own message names the offending field for an unknown
+		// one, which is the difference between "their form is out of date" and
+		// "somebody is poking at this".
+		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "could not read submission"}, "detail", logsafe.String(err.Error()))
 		return
 	}
 
@@ -141,23 +148,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, ErrSpam):
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
-		h.log.Info("dropped submission", "reason", "honeypot", "form", h.form.ID, "ip", clientIP(r))
+		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
+			"reason", "honeypot", "ip", clientIP(r), "origin", logsafe.String(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
 	case err != nil:
 		var ve ValidationError
 		if errors.As(err, &ve) {
-			writeJSON(w, http.StatusUnprocessableEntity, errorBody{
+			h.refuse(w, r, http.StatusUnprocessableEntity, errorBody{
 				Error: "invalid submission", Field: ve.Field, Reason: ve.Reason,
-			})
+			}, "field", ve.Field, "why", ve.Reason)
 			return
 		}
-		writeJSON(w, http.StatusBadRequest, errorBody{Error: "invalid submission"})
+		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "invalid submission"})
 		return
 	}
 
 	if msg.Subject, err = h.subjectFor(msg); err != nil {
-		h.log.Error("could not build subject", "form", h.form.ID, "error", err)
+		h.log.Error("could not build subject", "form", h.form.ID,
+			"status", http.StatusInternalServerError, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody{Error: "could not send message"})
 		return
 	}
@@ -165,13 +174,51 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.mailer.Send(r.Context(), msg); err != nil {
 		// The sender's address is theirs, not ours to log in full on a failure
 		// path that gets read by whoever is on call.
-		h.log.Error("could not send message", "form", h.form.ID, "error", err)
+		h.log.Error("could not send message", "form", h.form.ID,
+			"status", http.StatusBadGateway, "error", err)
 		writeJSON(w, http.StatusBadGateway, errorBody{Error: "could not send message"})
 		return
 	}
 
-	h.log.Info("sent message", "form", h.form.ID, "from", msg.Email)
+	h.log.Info("sent message", "form", h.form.ID, "status", http.StatusAccepted,
+		"from", logsafe.String(msg.Email))
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
+}
+
+// refuse answers a request this form will not accept, and says so in the log.
+//
+// Every non-success path goes through here, which is the point: refusals used
+// to return in silence, so "nothing in the logs" meant either that the service
+// turned a submission away or that it never arrived at all — two very different
+// problems with identical evidence. Routing them all through one place also
+// means a new refusal cannot be added without one.
+func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, body errorBody, extra ...any) {
+	// Somebody else's page posting here, or one address flooding the form, is
+	// worth noticing. A visitor mistyping their email address is not.
+	level := slog.LevelInfo
+	switch status {
+	case http.StatusForbidden, http.StatusTooManyRequests:
+		level = slog.LevelWarn
+	}
+
+	attrs := []any{
+		"form", h.form.ID,
+		"status", status,
+		"reason", body.Error,
+		"ip", clientIP(r),
+		"origin", logsafe.String(r.Header.Get("Origin")),
+	}
+	// Cloudflare stamps every request it forwards. Carrying it means a line
+	// here can be matched against Cloudflare's own log for the same request,
+	// which is how you find out whether something in front of this service is
+	// answering on its behalf.
+	if ray := r.Header.Get("CF-Ray"); ray != "" {
+		attrs = append(attrs, "cf_ray", logsafe.String(ray))
+	}
+	attrs = append(attrs, extra...)
+
+	h.log.Log(r.Context(), level, "refused submission", attrs...)
+	writeJSON(w, status, body)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -180,21 +227,28 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// clientIP prefers X-Forwarded-For's first entry, because this runs behind
-// Traefik and RemoteAddr would otherwise be the proxy for every visitor —
-// which would rate-limit the whole internet as one client.
+// clientIP prefers X-Forwarded-For's first entry, because this runs behind a
+// proxy and RemoteAddr would otherwise be the proxy for every visitor — which
+// would rate-limit the whole internet as one client.
+//
+// Whatever comes back has parsed as an address. That header is set by whoever
+// sent the request, so without this the limiter is keyed on arbitrary strings
+// and the log carries them too. Note that this makes the value well-formed, not
+// truthful: believing it at all is what issue #6 is about.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if first, _, found := strings.Cut(xff, ","); found {
-			return strings.TrimSpace(first)
+		first, _, _ := strings.Cut(xff, ",")
+		if addr, err := netip.ParseAddr(strings.TrimSpace(first)); err == nil {
+			return addr.String()
 		}
-		return strings.TrimSpace(xff)
 	}
-	host, _, found := strings.Cut(r.RemoteAddr, ":")
-	if !found {
-		return r.RemoteAddr
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
 	}
-	return host
+	if addr, err := netip.ParseAddr(r.RemoteAddr); err == nil {
+		return addr.String()
+	}
+	return "unknown"
 }
 
 // limiter is a fixed window per client. Deliberately in memory and deliberately

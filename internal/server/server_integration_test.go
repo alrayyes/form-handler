@@ -126,6 +126,44 @@ func TestEachFormDeliversToItsOwnInbox(t *testing.T) {
 	assert.Contains(t, careers.Text, "compiler role")
 }
 
+// What CodeQL's email-injection warning is about: the message body is written
+// straight into an SMTP DATA section, and the body is whatever a visitor typed.
+//
+// Two ways that could go wrong. A line containing a single dot ends the DATA
+// section in SMTP, so a body carrying one could truncate the message — or, with
+// the right continuation, end it and start issuing commands. And a body that
+// looks like headers could add its own if it were written above the blank line
+// rather than below it.
+//
+// Neither works, and this is the test that says so rather than a comment
+// claiming it. If the delivery path is ever rewritten to compose the message by
+// hand, this fails.
+func TestAHostileBodyCannotTruncateOrInjectTheMessage(t *testing.T) {
+	ctx := context.Background()
+	smtpAddr, apiURL := startMailpit(ctx, t, 1)
+	srv := start(t, testConfig(smtpAddr, smtpAddr))
+
+	// A bare dot on its own line, a forged header block, and a second forged
+	// recipient — all inside the message field.
+	hostile := `Please get in touch.\r\n.\r\nBcc: everyone@example.com\r\n\r\nAnd this is after the dot.`
+	post(ctx, t, srv.URL+"/contact/marketing", marketingOrigin,
+		`{"name":"Ada Lovelace","email":"ada@example.com","message":"`+hostile+`","website":""}`,
+		http.StatusAccepted)
+
+	msg := waitForMessageTo(ctx, t, apiURL, "info@example.com")
+
+	// Everything after the dot still arrived, so the message was not cut short.
+	assert.Contains(t, msg.Text, "And this is after the dot.")
+	// And the forged header stayed text rather than becoming a header.
+	assert.Contains(t, msg.Text, "Bcc: everyone@example.com")
+	assert.Equal(t, "Contact form: Ada Lovelace", msg.Subject)
+	require.Len(t, msg.ReplyTo, 1)
+	assert.Equal(t, "ada@example.com", msg.ReplyTo[0].Address)
+
+	// One message, to the one recipient the form is configured with.
+	assert.Equal(t, 1, messageCount(ctx, t, apiURL))
+}
+
 // The reason origins are per form rather than global: a site that may post to
 // its own form must not be able to post to somebody else's.
 func TestAFormRefusesAnotherFormsOrigin(t *testing.T) {
