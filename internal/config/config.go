@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/mail"
 	"net/url"
 	"os"
@@ -40,6 +41,9 @@ const (
 // Config is the whole of what the service was told to do.
 type Config struct {
 	Addr string
+	// LogLevel is the lowest level that reaches the log. The access log puts
+	// health checks at debug, so this is what turns them on.
+	LogLevel slog.Level
 	// TrustedProxies are the hops between the internet and this service whose
 	// X-Forwarded-For contribution can be believed. Empty means none, and the
 	// header is then ignored — see internal/clientip for why that is the safe
@@ -101,6 +105,12 @@ var formID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 // and what every version before multi-form support did.
 func Load() (Config, error) {
 	cfg := Config{Addr: env("ADDR", DefaultAddr)}
+
+	level, err := parseLevel(env("LOG_LEVEL", "info"))
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.LogLevel = level
 
 	if raw := os.Getenv("TRUSTED_PROXIES"); strings.TrimSpace(raw) != "" {
 		for _, p := range strings.Split(raw, ",") {
@@ -533,4 +543,21 @@ func describe(index int, id string) string {
 		return fmt.Sprintf("%q", id)
 	}
 	return fmt.Sprintf("#%d", index)
+}
+
+// parseLevel reads LOG_LEVEL. Named levels rather than slog's numbers, because
+// nobody deploying this wants to know that warn is 4.
+func parseLevel(raw string) (slog.Level, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "debug":
+		return slog.LevelDebug, nil
+	case "info":
+		return slog.LevelInfo, nil
+	case "warn", "warning":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	default:
+		return 0, fmt.Errorf("LOG_LEVEL %q is not debug, info, warn or error", raw)
+	}
 }

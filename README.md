@@ -111,6 +111,7 @@ ALLOWED_ORIGINS=https://www.example.com \
 | `FORMS_FILE`          | unset            | Path to a forms file. Setting it replaces the four variables above — see below.    |
 | `TRUSTED_PROXIES`     | unset            | Comma-separated IPs or CIDRs of proxies in front. Unset ignores `X-Forwarded-For`. |
 | `ADDR`                | `:8080`          | Listen address.                                                                    |
+| `LOG_LEVEL`           | `info`           | `debug`, `info`, `warn` or `error`. Health checks are logged at `debug`.           |
 
 That form is called `default`, which is what makes both `/contact` and
 `/contact/default` reach it.
@@ -332,12 +333,38 @@ will be wrong by the time you read it.
 
 ## Logs
 
-JSON on stdout, one line per request that got an answer — accepted or refused.
-Every line carries `form` and `status`, so the whole of "what is this service
-doing" is one filter:
+JSON on stdout, and **every request gets a line** — including health checks,
+preflights and requests for paths nobody serves. Anything the service answered
+is in there:
+
+```json
+{
+  "level": "INFO",
+  "msg": "request",
+  "method": "POST",
+  "path": "/contact/marketing",
+  "status": 202,
+  "duration_ms": 84
+}
+```
+
+A submission that was refused gets two lines: that one, saying what happened,
+and one from the form saying why. One is for counting, the other for acting on.
+
+The level follows the outcome — `5xx` is `ERROR`, `4xx` is `WARN`, the rest
+`INFO` — so "show me what is going wrong" is a filter rather than a
+read-through:
 
 ```sh
 docker logs form-handler | jq 'select(.status >= 400)'
+```
+
+**Health checks are at `debug`.** An orchestrator probes `/healthz` every few
+seconds, and at `info` that would be the only thing anybody ever saw. Set
+`LOG_LEVEL=debug` to see them:
+
+```sh
+LOG_LEVEL=debug form-handler
 ```
 
 A refusal says why, and names the `origin` it saw:
