@@ -190,7 +190,9 @@ jobs:
 
           # goreleaser already grouped these by change type. Asking the release
           # for them keeps the two copies identical by construction.
-          NOTES=$(gh release view "$VERSION" --json body -q .body)
+          # goreleaser's body opens with its own "## Changelog" heading, which
+          # would sit directly under the version heading saying the same thing.
+          NOTES=$(gh release view "$VERSION" --json body -q .body | grep -v '^## Changelog$')
 
           # Insert directly under the marker, so the newest release is the first
           # one a reader meets and the preamble above it stays put.
