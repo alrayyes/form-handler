@@ -1,0 +1,212 @@
+# Nobody picks a version. The Conventional Commits that landed decide it, and
+# merging cuts the release.
+#
+# One workflow rather than two, because a tag pushed with GITHUB_TOKEN does not
+# start a new workflow run — so the job that decides the version has to be the
+# same run that publishes it. It also answers a tag pushed by hand, which is how
+# the first release of all was cut.
+name: release
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# Never two releases at once, and never cancel one halfway: a killed run can
+# leave a tag pushed and nothing published against it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Works out what, if anything, is being released, and tags it.
+  version:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # pushes the tag
+    outputs:
+      version: ${{ steps.decide.outputs.version }}
+      release: ${{ steps.decide.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install svu
+        run: go install github.com/caarlos0/svu/v3@v3.4.1
+      - id: decide
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # A tag was pushed by hand. Publish exactly that, and do not argue
+          # with it — this is the escape hatch for the first release and for
+          # any version somebody deliberately chose.
+          if [ "$REF_TYPE" = "tag" ]; then
+            echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing the pushed tag $REF_NAME."
+            exit 0
+          fi
+
+          git fetch --tags --force
+
+          # The first version is a decision, not a calculation. Until a v* tag
+          # exists there is nothing to count commits since, and guessing would
+          # release a 0.1.0 nobody asked for.
+          if [ -z "$(git tag -l 'v*')" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No v* tag exists yet. Push the first one by hand; every release after it is automatic." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CURRENT=$(svu current)
+          NEXT=$(svu next)
+          echo "Current $CURRENT, next $NEXT."
+
+          # A branch of only docs: and chore: adds up to the version already
+          # released, and releases nothing. That is the intent, not a failure.
+          if [ "$NEXT" = "$CURRENT" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing to release: the commits since $CURRENT do not change the version." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEXT" -m "$NEXT"
+          git push origin "$NEXT"
+
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "Tagged $NEXT." >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: version
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # writes the GitHub release
+      packages: write # pushes the image to ghcr.io
+      id-token: write # signs the provenance attestation
+      attestations: write
+    outputs:
+      digest: ${{ steps.ko.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tag, not the branch: goreleaser takes the version from the ref
+          # it is standing on, and needs the history to write the notes.
+          ref: ${{ needs.version.outputs.version }}
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: goreleaser
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          version: v2.17.1
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: ko-build/setup-ko@61b4d1d396f5b2e7d6bb6fefdce3dc38d1a13445 # v0.10
+        with:
+          version: v0.19.1
+
+      # There is no Dockerfile. ko compiles the binary and assembles the layers
+      # itself over the registry API, from what .ko.yaml says — the same
+      # distroless base, pinned to the same digest, without a daemon.
+      - name: Build and push the image
+        id: ko
+        env:
+          KO_DOCKER_REPO: ghcr.io/${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ko login ghcr.io -u "${{ github.actor }}" --password-stdin <<< "$GITHUB_TOKEN"
+
+          # --bare puts the image at KO_DOCKER_REPO exactly, rather than under a
+          # path derived from the Go import path. The ref goes to a file rather
+          # than being read off stdout, which ko also writes progress to.
+          ko build --bare \
+            --platform=linux/amd64,linux/arm64 \
+            --tags="${VERSION#v}","$VERSION",latest \
+            --image-refs=image-refs.txt \
+            ./
+
+          REF=$(head -1 image-refs.txt)
+          echo "digest=${REF##*@}" >> "$GITHUB_OUTPUT"
+          echo "Pushed \`$REF\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # What built this image, from which commit, provable without trusting the
+      # summary above.
+      - name: Attest the image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.ko.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest the binaries
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+
+  # The changelog lives in the repo as well as on the release page, because the
+  # forge should not be the only readable copy.
+  changelog:
+    needs: [version, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+      - name: Write the release notes into CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # goreleaser already grouped these by change type. Asking the release
+          # for them keeps the two copies identical by construction.
+          NOTES=$(gh release view "$VERSION" --json body -q .body)
+
+          # Insert directly under the marker, so the newest release is the first
+          # one a reader meets and the preamble above it stays put.
+          awk -v version="$VERSION" -v notes="$NOTES" '
+            { print }
+            /releases below/ && !done {
+              printf "\n## %s\n\n%s\n", version, notes
+              done = 1
+            }
+          ' CHANGELOG.md > CHANGELOG.next
+          mv CHANGELOG.next CHANGELOG.md
+
+          if git diff --quiet CHANGELOG.md; then
+            echo "Nothing to add to the changelog."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          # [skip ci] because this commit is the release's own housekeeping.
+          # It touches the changelog and nothing else, and is no licence for a
+          # bot to commit anything more.
+          git commit -m "chore(release): $VERSION [skip ci]"
+          git push origin master
