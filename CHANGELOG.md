@@ -11,6 +11,13 @@ alone.
 
 <!-- releases below -->
 
+## v1.3.1
+
+### Fixes
+* 5654f1f501fd17ebbae80cdade767d734ffcdd79 fix(security): strip line breaks by name so the sanitiser is recognised
+### Everything else
+* e332d49ce22e29a8e6630adb11877753b078494f Merge pull request #9 from alrayyes/fix/logsafe-recognised
+
 ## v1.3.0
 
 ### Features
