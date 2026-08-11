@@ -215,7 +215,7 @@ docker run --rm -p 1025:1025 -p 8025:8025 \
 Mailpit's web interface is on <http://localhost:8025>, and anything the service
 sends appears there instead of on the internet.
 
-Two flags, both for asking the binary about itself rather than for running it:
+Three flags, all for asking the binary about itself rather than for running it:
 
 ```sh
 form-handler --version      # the tag it was built from, or "dev"

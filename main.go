@@ -64,10 +64,13 @@ var legacyFlags = []string{"-healthcheck", "-version"}
 // It is a compatibility shim rather than a nicety. `flag` treats a single dash
 // and a double dash alike, so `-healthcheck` is what the README documented and,
 // more to the point, what the healthcheck baked into already-deployed compose
-// files runs. pflag reads a single dash as a cluster of shorthands instead, and
-// the first letter of `-healthcheck` is `h` — help. Without this, a container
-// probing itself prints usage, exits 0 and reports healthy no matter what the
-// service is doing.
+// files runs. pflag reads a single dash as a cluster of shorthands instead, so
+// without this `-healthcheck` becomes `-h -e -a ...` and dies on the first
+// letter it does not know: `error: unknown shorthand flag: 'e' in -ealthcheck`.
+//
+// That fails closed rather than open — a container whose probe cannot parse its
+// own arguments is reported unhealthy, not healthy — but it is still a
+// perfectly working deployment brought down by an argument that used to work.
 //
 // Only these two exact arguments are rewritten. Anything else keeps its
 // meaning, so `-nonsense` is still an error rather than being promoted into a
