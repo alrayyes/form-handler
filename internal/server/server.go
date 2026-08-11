@@ -58,7 +58,17 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 	// Without this, a post to a form that does not exist gets net/http's plain
 	// text 404, which is a surprise for a client that has only ever been sent
 	// JSON by this service.
-	mux.HandleFunc("/contact/", func(w http.ResponseWriter, _ *http.Request) {
+	//
+	// It is logged for the same reason the handler logs its refusals: a site
+	// posting at the wrong path looks exactly like a site whose requests never
+	// arrive, and the two are fixed in different places.
+	mux.HandleFunc("/contact/", func(w http.ResponseWriter, r *http.Request) {
+		log.Warn("refused submission",
+			"status", http.StatusNotFound,
+			"reason", "unknown form",
+			"path", r.URL.Path,
+			"origin", r.Header.Get("Origin"),
+		)
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown form"})
 	})
 

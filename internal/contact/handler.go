@@ -105,7 +105,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST, OPTIONS")
-		writeJSON(w, http.StatusMethodNotAllowed, errorBody{Error: "method not allowed"})
+		h.refuse(w, r, http.StatusMethodNotAllowed, errorBody{Error: "method not allowed"}, "method", r.Method)
 		return
 	}
 
@@ -117,12 +117,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// list is a misconfiguration, and the safe reading of "nobody is allowed"
 	// is not "everybody is".
 	if !h.origins[origin] {
-		writeJSON(w, http.StatusForbidden, errorBody{Error: "origin not allowed"})
+		h.refuse(w, r, http.StatusForbidden, errorBody{Error: "origin not allowed"})
 		return
 	}
 
 	if !h.limiter.allow(clientIP(r)) {
-		writeJSON(w, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
+		h.refuse(w, r, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
 		return
 	}
 
@@ -132,7 +132,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&sub); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorBody{Error: "could not read submission"})
+		// The decoder's own message names the offending field for an unknown
+		// one, which is the difference between "their form is out of date" and
+		// "somebody is poking at this".
+		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "could not read submission"}, "detail", clip(err.Error()))
 		return
 	}
 
@@ -141,23 +144,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, ErrSpam):
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
-		h.log.Info("dropped submission", "reason", "honeypot", "form", h.form.ID, "ip", clientIP(r))
+		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
+			"reason", "honeypot", "ip", clientIP(r), "origin", clip(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
 	case err != nil:
 		var ve ValidationError
 		if errors.As(err, &ve) {
-			writeJSON(w, http.StatusUnprocessableEntity, errorBody{
+			h.refuse(w, r, http.StatusUnprocessableEntity, errorBody{
 				Error: "invalid submission", Field: ve.Field, Reason: ve.Reason,
-			})
+			}, "field", ve.Field, "why", ve.Reason)
 			return
 		}
-		writeJSON(w, http.StatusBadRequest, errorBody{Error: "invalid submission"})
+		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "invalid submission"})
 		return
 	}
 
 	if msg.Subject, err = h.subjectFor(msg); err != nil {
-		h.log.Error("could not build subject", "form", h.form.ID, "error", err)
+		h.log.Error("could not build subject", "form", h.form.ID,
+			"status", http.StatusInternalServerError, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody{Error: "could not send message"})
 		return
 	}
@@ -165,13 +170,63 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.mailer.Send(r.Context(), msg); err != nil {
 		// The sender's address is theirs, not ours to log in full on a failure
 		// path that gets read by whoever is on call.
-		h.log.Error("could not send message", "form", h.form.ID, "error", err)
+		h.log.Error("could not send message", "form", h.form.ID,
+			"status", http.StatusBadGateway, "error", err)
 		writeJSON(w, http.StatusBadGateway, errorBody{Error: "could not send message"})
 		return
 	}
 
-	h.log.Info("sent message", "form", h.form.ID, "from", msg.Email)
+	h.log.Info("sent message", "form", h.form.ID, "status", http.StatusAccepted, "from", msg.Email)
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
+}
+
+// maxLoggedHeader bounds a header before it reaches a log line. Origin and
+// CF-Ray are whatever the sender put in them, and an unbounded one turns a log
+// file into somewhere to write a novel.
+const maxLoggedHeader = 200
+
+// refuse answers a request this form will not accept, and says so in the log.
+//
+// Every non-success path goes through here, which is the point: refusals used
+// to return in silence, so "nothing in the logs" meant either that the service
+// turned a submission away or that it never arrived at all — two very different
+// problems with identical evidence. Routing them all through one place also
+// means a new refusal cannot be added without one.
+func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, body errorBody, extra ...any) {
+	// Somebody else's page posting here, or one address flooding the form, is
+	// worth noticing. A visitor mistyping their email address is not.
+	level := slog.LevelInfo
+	switch status {
+	case http.StatusForbidden, http.StatusTooManyRequests:
+		level = slog.LevelWarn
+	}
+
+	attrs := []any{
+		"form", h.form.ID,
+		"status", status,
+		"reason", body.Error,
+		"ip", clientIP(r),
+		"origin", clip(r.Header.Get("Origin")),
+	}
+	// Cloudflare stamps every request it forwards. Carrying it means a line
+	// here can be matched against Cloudflare's own log for the same request,
+	// which is how you find out whether something in front of this service is
+	// answering on its behalf.
+	if ray := r.Header.Get("CF-Ray"); ray != "" {
+		attrs = append(attrs, "cf_ray", clip(ray))
+	}
+	attrs = append(attrs, extra...)
+
+	h.log.Log(r.Context(), level, "refused submission", attrs...)
+	writeJSON(w, status, body)
+}
+
+// clip bounds an attacker-controlled string on its way to a log line.
+func clip(v string) string {
+	if len(v) <= maxLoggedHeader {
+		return v
+	}
+	return v[:maxLoggedHeader] + "…"
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

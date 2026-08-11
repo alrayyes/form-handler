@@ -303,6 +303,54 @@ is automated. Unknown fields are rejected outright.
 mail server being briefly unreachable is not a reason for an orchestrator to
 restart a process that is answering perfectly well.
 
+## Logs
+
+JSON on stdout, one line per request that got an answer — accepted or refused.
+Every line carries `form` and `status`, so the whole of "what is this service
+doing" is one filter:
+
+```sh
+docker logs form-handler | jq 'select(.status >= 400)'
+```
+
+A refusal says why, and names the `origin` it saw:
+
+```json
+{
+  "time": "2026-08-11T18:04:11Z",
+  "level": "WARN",
+  "msg": "refused submission",
+  "form": "marketing",
+  "status": 403,
+  "reason": "origin not allowed",
+  "ip": "203.0.113.7",
+  "origin": "https://staging.example.com",
+  "cf_ray": "8f2b1c4d5e6f7a8b-AMS"
+}
+```
+
+`403` and `429` are `WARN` — somebody else's page posting here, or one address
+flooding the form, is worth noticing. A visitor mistyping their address is
+`INFO`.
+
+**This is how you tell whether a missing submission was refused here or never
+arrived.** A form that stops working has two very different causes with
+identical symptoms: something in front of this service — Cloudflare, a proxy —
+turning the request away, or this service refusing it on the origin check. Post
+a test submission and look:
+
+- **A line with `status: 403`** — it reached the service and the `origin` field
+  says what it presented. Add that origin to the form, or fix what the site is
+  sending.
+- **No line at all** — it never got here. The problem is in front: a Cloudflare
+  rule, a WAF, DNS, or the proxy.
+
+`cf_ray` is Cloudflare's request id, copied from `CF-Ray` when present, so a
+line here can be matched against the same request in Cloudflare's own logs.
+
+Headers are truncated before they reach a log line — `origin` and `cf_ray` are
+whatever the sender chose to put in them.
+
 ## Decisions worth knowing
 
 **A caught bot gets `202`, exactly like a real submission.** Same status, same
