@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package contact_test
+package http_test
 
 import (
 	"bytes"
@@ -14,8 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alrayyes/form-handler/internal/clientip"
-	"github.com/alrayyes/form-handler/internal/contact"
+	adapterhttp "github.com/alrayyes/form-handler/internal/adapter/http"
 )
 
 // logged is one line of the service's JSON log, decoded.
@@ -23,16 +22,11 @@ type logged map[string]any
 
 // capture builds a handler whose log goes somewhere the test can read, which is
 // the only way to assert on the thing an operator actually sees.
-func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
+func capture(t *testing.T, perHour int) (*adapterhttp.Handler, func() []logged) {
 	t.Helper()
 
 	var buf bytes.Buffer
-	h, err := contact.NewHandler(contact.Form{
-		ID:          "marketing",
-		Origins:     []string{origin},
-		RatePerHour: perHour,
-	}, &recorder{}, slog.New(slog.NewJSONHandler(&buf, nil)), clientip.Resolver{})
-	require.NoError(t, err)
+	h := build(t, &recorder{}, perHour, slog.New(slog.NewJSONHandler(&buf, nil)))
 
 	return h, func() []logged {
 		var out []logged

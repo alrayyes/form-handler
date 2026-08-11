@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package contact_test
+package domain_test
 
 import (
 	"strings"
@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 )
 
-func valid() contact.Submission {
-	return contact.Submission{
+func valid() domain.Submission {
+	return domain.Submission{
 		Name:    "Ada Lovelace",
 		Email:   "ada@example.com",
 		Message: "Please get in touch about an awkward system.",
@@ -21,7 +21,7 @@ func valid() contact.Submission {
 }
 
 func TestValidateAcceptsAGoodSubmission(t *testing.T) {
-	msg, err := contact.Validate(valid())
+	msg, err := domain.Validate(valid())
 
 	require.NoError(t, err)
 	assert.Equal(t, "ada@example.com", msg.Email)
@@ -35,28 +35,28 @@ func TestValidateTrimsBeforeMeasuring(t *testing.T) {
 	s := valid()
 	s.Name = "   "
 
-	_, err := contact.Validate(s)
+	_, err := domain.Validate(s)
 
-	var ve contact.ValidationError
+	var ve domain.ValidationError
 	require.ErrorAs(t, err, &ve)
 	assert.Equal(t, "name", ve.Field)
 }
 
 func TestValidateRejectsBadInput(t *testing.T) {
 	cases := map[string]struct {
-		mutate func(*contact.Submission)
+		mutate func(*domain.Submission)
 		field  string
 	}{
-		"no name":         {func(s *contact.Submission) { s.Name = "" }, "name"},
-		"long name":       {func(s *contact.Submission) { s.Name = strings.Repeat("a", 101) }, "name"},
-		"no email":        {func(s *contact.Submission) { s.Email = "" }, "email"},
-		"malformed email": {func(s *contact.Submission) { s.Email = "not-an-address" }, "email"},
-		"no message":      {func(s *contact.Submission) { s.Message = "" }, "message"},
-		"short message":   {func(s *contact.Submission) { s.Message = "hi" }, "message"},
-		"long message":    {func(s *contact.Submission) { s.Message = strings.Repeat("a", 5001) }, "message"},
+		"no name":         {func(s *domain.Submission) { s.Name = "" }, "name"},
+		"long name":       {func(s *domain.Submission) { s.Name = strings.Repeat("a", 101) }, "name"},
+		"no email":        {func(s *domain.Submission) { s.Email = "" }, "email"},
+		"malformed email": {func(s *domain.Submission) { s.Email = "not-an-address" }, "email"},
+		"no message":      {func(s *domain.Submission) { s.Message = "" }, "message"},
+		"short message":   {func(s *domain.Submission) { s.Message = "hi" }, "message"},
+		"long message":    {func(s *domain.Submission) { s.Message = strings.Repeat("a", 5001) }, "message"},
 		// ParseAddress accepts this, but taking it would let a sender choose the
 		// display name that appears in the reply header.
-		"display name": {func(s *contact.Submission) { s.Email = "Ada <ada@example.com>" }, "email"},
+		"display name": {func(s *domain.Submission) { s.Email = "Ada <ada@example.com>" }, "email"},
 	}
 
 	for name, tc := range cases {
@@ -64,9 +64,9 @@ func TestValidateRejectsBadInput(t *testing.T) {
 			s := valid()
 			tc.mutate(&s)
 
-			_, err := contact.Validate(s)
+			_, err := domain.Validate(s)
 
-			var ve contact.ValidationError
+			var ve domain.ValidationError
 			require.ErrorAs(t, err, &ve)
 			assert.Equal(t, tc.field, ve.Field)
 		})
@@ -79,7 +79,7 @@ func TestValidateCountsRunesNotBytes(t *testing.T) {
 	// exactly at the documented limit.
 	s.Name = strings.Repeat("é", 100)
 
-	_, err := contact.Validate(s)
+	_, err := domain.Validate(s)
 
 	require.NoError(t, err, "a 100-rune name is exactly at the documented limit")
 }
@@ -88,7 +88,7 @@ func TestValidateCatchesTheHoneypot(t *testing.T) {
 	s := valid()
 	s.Website = "http://spam.example"
 
-	_, err := contact.Validate(s)
+	_, err := domain.Validate(s)
 
-	require.ErrorIs(t, err, contact.ErrSpam)
+	require.ErrorIs(t, err, domain.ErrSpam)
 }

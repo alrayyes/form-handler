@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package contact_test
+package domain_test
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 )
 
 // The ordinary path: an untrusted Submission goes in, a Message that has been
@@ -16,7 +16,7 @@ import (
 // — two forms on one service word it differently — so the Handler renders it
 // from that form's template.
 func ExampleValidate() {
-	msg, err := contact.Validate(contact.Submission{
+	msg, err := domain.Validate(domain.Submission{
 		Name:    "  Ada Lovelace  ",
 		Email:   "ada@example.com",
 		Message: "Please get in touch about an awkward system.",
@@ -39,14 +39,14 @@ func ExampleValidate() {
 // you would a real submission, because telling it which field gave it away only
 // teaches whoever wrote it what to leave alone next time.
 func ExampleValidate_honeypot() {
-	_, err := contact.Validate(contact.Submission{
+	_, err := domain.Validate(domain.Submission{
 		Name:    "Bot",
 		Email:   "bot@example.com",
 		Message: "Cheap watches, buy now please.",
 		Website: "http://spam.example",
 	})
 
-	fmt.Println(errors.Is(err, contact.ErrSpam))
+	fmt.Println(errors.Is(err, domain.ErrSpam))
 	// Output:
 	// true
 }
@@ -54,13 +54,13 @@ func ExampleValidate_honeypot() {
 // A rejected field says which one and why, so the browser can point at it
 // rather than showing a generic failure.
 func ExampleValidate_validationError() {
-	_, err := contact.Validate(contact.Submission{
+	_, err := domain.Validate(domain.Submission{
 		Name:    "Ada Lovelace",
 		Email:   "not-an-address",
 		Message: "Please get in touch about an awkward system.",
 	})
 
-	var ve contact.ValidationError
+	var ve domain.ValidationError
 	if errors.As(err, &ve) {
 		fmt.Println(ve.Field, "->", ve.Reason)
 	}

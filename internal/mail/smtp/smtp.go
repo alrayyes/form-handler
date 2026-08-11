@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 )
 
 // provider names this adapter in a DeliveryError.
@@ -36,7 +36,7 @@ type Sender struct {
 // The visitor's address goes in Reply-To, never in From. Sending as them would
 // fail SPF for their domain and get the whole thing filed as spam — the mail is
 // from this service, about them.
-func (s Sender) Send(ctx context.Context, m contact.Message) error {
+func (s Sender) Send(ctx context.Context, m domain.Message) error {
 	timeout := s.Timeout
 	if timeout == 0 {
 		timeout = 10 * time.Second
@@ -49,21 +49,21 @@ func (s Sender) Send(ctx context.Context, m contact.Message) error {
 
 	host, _, err := net.SplitHostPort(s.Addr)
 	if err != nil {
-		return contact.Undeliverable(provider, "config", fmt.Errorf("address %q: %w", s.Addr, err))
+		return domain.Undeliverable(provider, "config", fmt.Errorf("address %q: %w", s.Addr, err))
 	}
 
 	conn, err := (&net.Dialer{Deadline: deadline}).DialContext(ctx, "tcp", s.Addr)
 	if err != nil {
-		return contact.Undeliverable(provider, "dial", err)
+		return domain.Undeliverable(provider, "dial", err)
 	}
 	defer func() { _ = conn.Close() }()
 	if err := conn.SetDeadline(deadline); err != nil {
-		return contact.Undeliverable(provider, "dial", err)
+		return domain.Undeliverable(provider, "dial", err)
 	}
 
 	client, err := netsmtp.NewClient(conn, host)
 	if err != nil {
-		return contact.Undeliverable(provider, "handshake", err)
+		return domain.Undeliverable(provider, "handshake", err)
 	}
 	defer func() { _ = client.Close() }()
 
@@ -72,41 +72,41 @@ func (s Sender) Send(ctx context.Context, m contact.Message) error {
 	// listen in on; refusing plaintext there would mean no mail at all.
 	if ok, _ := client.Extension("STARTTLS"); ok {
 		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			return contact.Undeliverable(provider, "starttls", err)
+			return domain.Undeliverable(provider, "starttls", err)
 		}
 	}
 
 	if s.Username != "" {
 		if err := client.Auth(netsmtp.PlainAuth("", s.Username, s.Password, host)); err != nil {
-			return contact.Undeliverable(provider, "auth", err)
+			return domain.Undeliverable(provider, "auth", err)
 		}
 	}
 
 	if err := client.Mail(s.From); err != nil {
-		return contact.Undeliverable(provider, "mail from", err)
+		return domain.Undeliverable(provider, "mail from", err)
 	}
 	if err := client.Rcpt(s.To); err != nil {
-		return contact.Undeliverable(provider, "rcpt to", err)
+		return domain.Undeliverable(provider, "rcpt to", err)
 	}
 
 	w, err := client.Data()
 	if err != nil {
-		return contact.Undeliverable(provider, "data", err)
+		return domain.Undeliverable(provider, "data", err)
 	}
 	if _, err := w.Write([]byte(s.compose(m))); err != nil {
-		return contact.Undeliverable(provider, "write body", err)
+		return domain.Undeliverable(provider, "write body", err)
 	}
 	if err := w.Close(); err != nil {
-		return contact.Undeliverable(provider, "close body", err)
+		return domain.Undeliverable(provider, "close body", err)
 	}
 
-	return contact.Undeliverable(provider, "quit", client.Quit())
+	return domain.Undeliverable(provider, "quit", client.Quit())
 }
 
 // compose builds the message. Headers are encoded rather than interpolated:
 // a name with a non-ASCII character is ordinary, and a name with a newline in
 // it is someone trying to add their own headers.
-func (s Sender) compose(m contact.Message) string {
+func (s Sender) compose(m domain.Message) string {
 	var b strings.Builder
 	enc := mime.QEncoding
 

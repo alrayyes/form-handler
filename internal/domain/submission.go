@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package contact turns a submitted form into a validated message and hands it
-// to something that can deliver it.
-package contact
+// Package domain holds the rules a contact form obeys, in the language of the
+// problem rather than of HTTP or SMTP.
+//
+// It is the innermost layer and imports nothing else from this service: no
+// transport, no configuration, no clock, no logger. Everything here is a fact
+// about what a contact submission is and when it is acceptable, which is why it
+// can be tested by calling a function with a struct.
+package domain
 
 import (
 	"context"
@@ -31,26 +36,6 @@ type Message struct {
 	Email   string
 	Subject string
 	Body    string
-}
-
-// Form is one configured form, in the terms this package needs: who may post to
-// it, how often, and what the resulting subject line says. Where the mail goes
-// is not here — that belongs to the Mailer the form is wired to, so a form and
-// its destination are chosen together at the composition root.
-type Form struct {
-	// ID is the last path segment of the endpoint, so it has to survive being
-	// in a URL. Validated by whatever builds the Form.
-	ID string
-	// Origins are the sites allowed to post to this form. Per form rather than
-	// global: one site being allowed to use its own form must not let it use
-	// somebody else's.
-	Origins []string
-	// Subject is a text/template rendered with .Name, .Email and .Form. Empty
-	// means DefaultSubject.
-	Subject string
-	// RatePerHour is submissions allowed per client address per hour. Zero
-	// disables the limit.
-	RatePerHour int
 }
 
 // DefaultSubject is what a form that does not name a subject template gets.
@@ -142,10 +127,10 @@ func Validate(s Submission) (Message, error) {
 	}, nil
 }
 
-// stripBreaks removes anything that could break out of a header. A newline in a
+// StripBreaks removes anything that could break out of a header. A newline in a
 // subject is how header injection works, and the name it is built from is
 // attacker-controlled.
-func stripBreaks(v string) string {
+func StripBreaks(v string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '\r' || r == '\n' {
 			return -1

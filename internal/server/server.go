@@ -10,13 +10,17 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
+	adapterhttp "github.com/alrayyes/form-handler/internal/adapter/http"
+	"github.com/alrayyes/form-handler/internal/adapter/ratelimit"
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/config"
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 	"github.com/alrayyes/form-handler/internal/logsafe"
 	"github.com/alrayyes/form-handler/internal/mail/mailgun"
 	"github.com/alrayyes/form-handler/internal/mail/smtp"
+	"github.com/alrayyes/form-handler/internal/usecase"
 )
 
 // New builds the handler for every configured form.
@@ -44,15 +48,20 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 			return nil, err
 		}
 
-		h, err := contact.NewHandler(contact.Form{
+		// The three layers meet here and nowhere else: a domain Form, a use
+		// case holding the rules, and an adapter putting it on the web. Each
+		// knows only the one inside it.
+		submit, err := usecase.NewSubmit(domain.Form{
 			ID:          f.ID,
 			Origins:     f.Origins,
 			Subject:     f.Subject,
 			RatePerHour: f.RateLimitPerHour,
-		}, sender, log, resolver)
+		}, sender, ratelimit.New(f.RateLimitPerHour, time.Hour))
 		if err != nil {
 			return nil, fmt.Errorf("form %q: %w", f.ID, err)
 		}
+
+		h := adapterhttp.NewHandler(submit, log, resolver)
 
 		mux.Handle("/contact/"+f.ID, h)
 		// /contact without an id is the single-form deployment's endpoint, and
@@ -111,7 +120,7 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 // domain declared the port, each adapter implements it, and the only place that
 // knows both exist is here. Adding a third provider means a case in this switch
 // and a package beside the other two, and nothing in internal/contact changes.
-func mailerFor(f config.Form) (contact.Mailer, error) {
+func mailerFor(f config.Form) (usecase.Mailer, error) {
 	switch {
 	case f.Mailgun != nil:
 		return mailgun.New(mailgun.Config{

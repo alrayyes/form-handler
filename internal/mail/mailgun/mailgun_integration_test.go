@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 	"github.com/alrayyes/form-handler/internal/mail/mailgun"
 )
 
@@ -84,7 +84,7 @@ func TestSendReachesMailgunAsThatDomain(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = sender.Send(context.Background(), contact.Message{
+	err = sender.Send(context.Background(), domain.Message{
 		Name:    "Ada Lovelace",
 		Email:   "ada@example.com",
 		Subject: "Contact form: Ada Lovelace",
@@ -116,7 +116,7 @@ func TestSendCarriesWhoSubmittedItInTheBody(t *testing.T) {
 	baseURL, got := stubMailgun(t, http.StatusOK, accepted)
 
 	sender := mustSender(t, baseURL)
-	require.NoError(t, sender.Send(context.Background(), contact.Message{
+	require.NoError(t, sender.Send(context.Background(), domain.Message{
 		Name:    "Ada Lovelace",
 		Email:   "ada@example.com",
 		Subject: "Contact form: Ada Lovelace",
@@ -133,7 +133,7 @@ func TestARefusedSendIsAnError(t *testing.T) {
 	baseURL, _ := stubMailgun(t, http.StatusUnauthorized, `{"message":"Invalid private key"}`)
 
 	sender := mustSender(t, baseURL)
-	err := sender.Send(context.Background(), contact.Message{
+	err := sender.Send(context.Background(), domain.Message{
 		Name: "Ada", Email: "ada@example.com", Subject: "s", Body: "b",
 	})
 
@@ -141,7 +141,7 @@ func TestARefusedSendIsAnError(t *testing.T) {
 
 	// Typed, so the handler can say which provider failed and at which step
 	// without parsing a string.
-	var de *contact.DeliveryError
+	var de *domain.DeliveryError
 	require.ErrorAs(t, err, &de)
 	assert.Equal(t, "mailgun", de.Provider)
 }

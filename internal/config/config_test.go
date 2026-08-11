@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alrayyes/form-handler/internal/config"
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 )
 
 func parse(t *testing.T, yaml string) ([]config.Form, error) {
@@ -78,7 +78,7 @@ func TestAnOmittedSubjectTakesTheDefault(t *testing.T) {
 	forms, err := parse(t, twoForms)
 
 	require.NoError(t, err)
-	assert.Equal(t, contact.DefaultSubject, forms[1].Subject)
+	assert.Equal(t, domain.DefaultSubject, forms[1].Subject)
 }
 
 func TestParseRejectsBadConfig(t *testing.T) {

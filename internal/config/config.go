@@ -24,7 +24,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 )
 
 // Defaults for the settings a form may leave out.
@@ -143,7 +143,7 @@ func formFromEnv() (Form, error) {
 		ID:      DefaultFormID,
 		From:    os.Getenv("MAIL_FROM"),
 		To:      os.Getenv("MAIL_TO"),
-		Subject: contact.DefaultSubject,
+		Subject: domain.DefaultSubject,
 		SMTP: &SMTP{
 			Addr:     env("SMTP_ADDR", DefaultSMTPAddr),
 			Username: os.Getenv("SMTP_USERNAME"),
@@ -346,7 +346,7 @@ func ParseForms(r io.Reader) ([]Form, error) {
 			Mailgun:          mgCfg,
 		}
 		if strings.TrimSpace(form.Subject) == "" {
-			form.Subject = contact.DefaultSubject
+			form.Subject = domain.DefaultSubject
 		}
 		if f.RateLimitPerHour != nil {
 			form.RateLimitPerHour = *f.RateLimitPerHour

@@ -17,7 +17,7 @@ import (
 
 	mg "github.com/mailgun/mailgun-go/v5"
 
-	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/domain"
 )
 
 // provider names this adapter in a DeliveryError.
@@ -129,7 +129,7 @@ func New(cfg Config) (*Sender, error) {
 // SMTP adapter follows and for the same reason. Sending as them would fail SPF
 // for their domain and file the whole thing as spam; the mail is from this
 // service, about them, and hitting reply still reaches them.
-func (s *Sender) Send(ctx context.Context, m contact.Message) error {
+func (s *Sender) Send(ctx context.Context, m domain.Message) error {
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
@@ -143,14 +143,14 @@ func (s *Sender) Send(ctx context.Context, m contact.Message) error {
 		if errors.Is(err, context.DeadlineExceeded) {
 			op = "timeout"
 		}
-		return contact.Undeliverable(provider, op, err)
+		return domain.Undeliverable(provider, op, err)
 	}
 	return nil
 }
 
 // body puts the submitter above their message. Whoever reads the inbox should
 // not have to open the headers to find out who wrote in.
-func body(m contact.Message) string {
+func body(m domain.Message) string {
 	var b strings.Builder
 	b.WriteString("Name:  " + m.Name + "\n")
 	b.WriteString("Email: " + m.Email + "\n\n")
