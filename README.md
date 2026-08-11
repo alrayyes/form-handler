@@ -316,8 +316,21 @@ writing to `master`; it touches the version and the changelog and nothing else.
 
 It is one workflow rather than two because a tag pushed with `GITHUB_TOKEN` does
 not start a new workflow run, so the job that decides the version has to be the
-same run that publishes it. No token beyond the built-in `GITHUB_TOKEN` is
-needed.
+same run that publishes it.
+
+The changelog commit is the one part that needs a credential of its own, and the
+reason is worth knowing before you change it. The ruleset on `master` requires
+seven status checks, and a direct push has none run against it, so GitHub refuses
+the built-in `GITHUB_TOKEN`. That token cannot be granted a ruleset bypass
+either: bypassing by app is an organisation feature and this repository belongs
+to a user. So the job pushes over SSH with a write-enabled **deploy key**, held
+in the `RELEASE_SSH_KEY` secret and named in the ruleset's bypass list. A deploy
+key rather than a personal access token on purpose — it is scoped to this one
+repository, it does not expire, and it cannot act as anybody.
+
+That commit carries `[skip ci]`, which is load-bearing rather than decorative: a
+deploy key push _does_ start workflows where a `GITHUB_TOKEN` push would not, so
+without it the pipeline would run in full to lint a changelog.
 
 The first tag is the exception: until a `v*` tag exists there is nothing to count
 commits since, so the release job says so and stops rather than releasing a

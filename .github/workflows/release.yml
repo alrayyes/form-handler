@@ -181,6 +181,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: master
+          # Pushed over SSH with a deploy key rather than with GITHUB_TOKEN.
+          # The ruleset on master requires seven status checks, and a direct
+          # push has none run against it, so the built-in token is refused —
+          # and it cannot be granted a bypass, because bypassing by app is an
+          # organisation feature and this repository belongs to a user. The
+          # deploy key can hold a bypass of its own, and unlike a personal
+          # token it cannot act as anybody.
+          ssh-key: ${{ secrets.RELEASE_SSH_KEY }}
       - name: Write the release notes into CHANGELOG.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -215,6 +223,9 @@ jobs:
           git add CHANGELOG.md
           # [skip ci] because this commit is the release's own housekeeping.
           # It touches the changelog and nothing else, and is no licence for a
-          # bot to commit anything more.
+          # bot to commit anything more. It is load-bearing here rather than
+          # decorative: a deploy key push does start workflows, where a
+          # GITHUB_TOKEN push would not, so without it this commit would run
+          # the whole pipeline again to lint a changelog.
           git commit -m "chore(release): $VERSION [skip ci]"
           git push origin master
