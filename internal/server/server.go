@@ -19,21 +19,23 @@ import (
 // New builds the handler for every configured form.
 //
 // Each form gets its own contact.Handler — its own origins, subject, and rate
-// limit — and its own mail.SMTP carrying that form's From and To. Sharing one
-// mailer and switching the recipient per request would work right up until two
-// forms were configured with the same id by accident, and then it would deliver
-// somebody's application to the marketing inbox.
+// limit — and its own mail.SMTP carrying that form's server, login, From and
+// To. Sharing one mailer and switching the recipient per request would work
+// right up until two forms were configured with the same id by accident, and
+// then it would deliver somebody's application to the marketing inbox. It also
+// could not hold two logins at once, which a provider that authenticates per
+// sending domain requires.
 func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	for _, f := range cfg.Forms {
 		sender := mail.SMTP{
-			Addr:     cfg.SMTP.Addr,
-			Username: cfg.SMTP.Username,
-			Password: cfg.SMTP.Password,
+			Addr:     f.SMTP.Addr,
+			Username: f.SMTP.Username,
+			Password: f.SMTP.Password,
 			From:     f.From,
 			To:       f.To,
-			Timeout:  cfg.SMTP.Timeout,
+			Timeout:  f.SMTP.Timeout,
 		}
 
 		h, err := contact.NewHandler(contact.Form{

@@ -6,12 +6,14 @@
 # answers at plain /contact.
 #
 # Without a FORMS_FILE the service falls back to a single form built from
-# MAIL_FROM, MAIL_TO and ALLOWED_ORIGINS, which is what a one-site deployment
-# wants and what this service did before it could hold more than one.
-#
-# The mail server itself is not in here. SMTP_ADDR, SMTP_USERNAME and
-# SMTP_PASSWORD stay in the environment, because a password does not belong in
-# a file that wants to be committed next to the site it serves.
+# MAIL_FROM, MAIL_TO, ALLOWED_ORIGINS and the SMTP_* variables, which is what a
+# one-site deployment wants and what this service did before it could hold more
+# than one.
+
+# Defaults for every form below, so forms sharing a mail server do not repeat
+# it. Anything here can be overridden per form.
+smtp:
+  addr: smtp.eu.mailgun.org:587
 
 forms:
   - id: marketing
@@ -27,7 +29,7 @@ forms:
     # Never the visitor's address. Sending as them fails SPF for their domain
     # and files the whole thing as spam; their address goes in Reply-To, so
     # hitting reply still reaches them.
-    from: site@example.com
+    from: postmaster@mg.example.com
     to: info@example.com
     # A Go text/template over .Name, .Email and .Form. Optional — leaving it out
     # gets "Contact form: {{ .Name }}". Line breaks are stripped from the result,
@@ -36,13 +38,33 @@ forms:
     # Submissions per client address per hour. Optional, defaults to 5. An
     # explicit 0 turns the limit off, which is not the same as leaving it out.
     rate_limit_per_hour: 5
+    # This form's own login. Mailgun issues one per sending domain, so two
+    # domains means two logins and they cannot be shared.
+    smtp:
+      username: postmaster@mg.example.com
+      # The password is not in here. password_env names the environment
+      # variable holding it, which is what lets this file live in git next to
+      # the site it serves. The service refuses to start if that variable is
+      # empty, so a missing secret is a failed deploy rather than a form that
+      # silently stops sending.
+      #
+      # Use `password:` instead if you mount this whole file as a secret and
+      # would rather keep it self-contained. Setting both is an error.
+      password_env: MAILGUN_EXAMPLE_COM
 
-  # A second form, on a different domain, landing in a different inbox. This is
-  # the reason the service holds more than one: careers mail should not arrive
-  # in the marketing inbox because both forms happened to share a service.
+  # A second form, on a different domain, sending through a different login and
+  # landing in a different inbox. This is the reason the service holds more than
+  # one: careers mail should not arrive in the marketing inbox, and it cannot be
+  # sent with the marketing domain's credentials anyway.
   - id: careers
     origins:
       - https://careers.example.org
-    from: site@example.com
-    to: jobs@example.com
+    from: postmaster@mg.example.org
+    to: jobs@example.org
     subject: "Application from {{ .Name }}"
+    smtp:
+      # Overriding the file-level default, field by field — a form that only
+      # sets a username keeps the shared address above.
+      addr: smtp.mailgun.org:587
+      username: postmaster@mg.example.org
+      password_env: MAILGUN_EXAMPLE_ORG

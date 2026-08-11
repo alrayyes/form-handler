@@ -45,9 +45,11 @@ const (
 	careersOrigin   = "https://careers.example.org"
 )
 
-func testConfig(smtpAddr string) config.Config {
+// Two forms pointed at two different mail servers, which is what a provider
+// like Mailgun forces: each sending domain has its own login, so "which server
+// and which credentials" is a property of the form, not of the service.
+func testConfig(marketingSMTP, careersSMTP string) config.Config {
 	return config.Config{
-		SMTP: config.SMTP{Addr: smtpAddr, Timeout: 10 * time.Second},
 		Forms: []config.Form{
 			{
 				ID:               "marketing",
@@ -56,6 +58,7 @@ func testConfig(smtpAddr string) config.Config {
 				To:               "info@example.com",
 				Subject:          "Contact form: {{ .Name }}",
 				RateLimitPerHour: 100,
+				SMTP:             config.SMTP{Addr: marketingSMTP, Timeout: 10 * time.Second},
 			},
 			{
 				ID:               "careers",
@@ -64,15 +67,38 @@ func testConfig(smtpAddr string) config.Config {
 				To:               "jobs@example.com",
 				Subject:          "Application from {{ .Name }}",
 				RateLimitPerHour: 100,
+				SMTP:             config.SMTP{Addr: careersSMTP, Timeout: 10 * time.Second},
 			},
 		},
 	}
 }
 
+// The whole point of per-form SMTP: each form's mail leaves through its own
+// server, so a message posted at one form cannot turn up on the other's.
+func TestEachFormSendsThroughItsOwnServer(t *testing.T) {
+	ctx := context.Background()
+	marketingSMTP, marketingAPI := startMailpit(t, ctx, 1)
+	careersSMTP, careersAPI := startMailpit(t, ctx, 2)
+	srv := start(t, testConfig(marketingSMTP, careersSMTP))
+
+	post(t, ctx, srv.URL+"/contact/careers", careersOrigin,
+		`{"name":"Grace Hopper","email":"grace@example.com","message":"I would like to apply for the compiler role.","website":""}`,
+		http.StatusAccepted)
+
+	careers := waitForMessageTo(t, ctx, careersAPI, "jobs@example.com")
+	assert.Equal(t, "Application from Grace Hopper", careers.Subject)
+
+	// The marketing server saw nothing, because that form was not posted to.
+	// A shared mailer with a switched recipient would pass every other
+	// assertion in this file and fail this one.
+	assert.Zero(t, messageCount(t, ctx, marketingAPI),
+		"the careers form sent through the marketing server")
+}
+
 func TestEachFormDeliversToItsOwnInbox(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, apiURL := startMailpit(t, ctx)
-	srv := start(t, testConfig(smtpAddr))
+	smtpAddr, apiURL := startMailpit(t, ctx, 1)
+	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
 	post(t, ctx, srv.URL+"/contact/marketing", marketingOrigin,
 		`{"name":"Ada Lovelace","email":"ada@example.com","message":"Please get in touch about an awkward system.","website":""}`,
@@ -104,8 +130,8 @@ func TestEachFormDeliversToItsOwnInbox(t *testing.T) {
 // its own form must not be able to post to somebody else's.
 func TestAFormRefusesAnotherFormsOrigin(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, apiURL := startMailpit(t, ctx)
-	srv := start(t, testConfig(smtpAddr))
+	smtpAddr, apiURL := startMailpit(t, ctx, 1)
+	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
 	post(t, ctx, srv.URL+"/contact/marketing", careersOrigin,
 		`{"name":"Ada Lovelace","email":"ada@example.com","message":"Posting this at the wrong form entirely.","website":""}`,
@@ -117,8 +143,8 @@ func TestAFormRefusesAnotherFormsOrigin(t *testing.T) {
 
 func TestAnUnknownFormIsNotFound(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, _ := startMailpit(t, ctx)
-	srv := start(t, testConfig(smtpAddr))
+	smtpAddr, _ := startMailpit(t, ctx, 1)
+	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
 	post(t, ctx, srv.URL+"/contact/nonexistent", marketingOrigin,
 		`{"name":"Ada Lovelace","email":"ada@example.com","message":"Nobody is listening at this address.","website":""}`,
@@ -127,8 +153,8 @@ func TestAnUnknownFormIsNotFound(t *testing.T) {
 
 func TestHoneypotIsAcceptedButNotDelivered(t *testing.T) {
 	ctx := context.Background()
-	smtpAddr, apiURL := startMailpit(t, ctx)
-	srv := start(t, testConfig(smtpAddr))
+	smtpAddr, apiURL := startMailpit(t, ctx, 1)
+	srv := start(t, testConfig(smtpAddr, smtpAddr))
 
 	// Indistinguishable from success, on purpose.
 	post(t, ctx, srv.URL+"/contact/marketing", marketingOrigin,
@@ -142,7 +168,7 @@ func TestHoneypotIsAcceptedButNotDelivered(t *testing.T) {
 
 func TestHealthzAnswersWithoutTouchingSMTP(t *testing.T) {
 	ctx := context.Background()
-	srv := start(t, testConfig("127.0.0.1:1"))
+	srv := start(t, testConfig("127.0.0.1:1", "127.0.0.1:1"))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/healthz", nil)
 	require.NoError(t, err)
@@ -191,10 +217,19 @@ func post(t *testing.T, ctx context.Context, url, origin, body string, want int)
 // ordinary service container and points these variables at it.
 //
 // The tests are identical either way; only who started the mail server differs.
-func startMailpit(t *testing.T, ctx context.Context) (smtpAddr, apiURL string) {
+// The instance argument is why there are two sets of variables: proving that
+// each form sends through its own server needs two servers, and in CI those
+// are two service containers rather than two containers this test started.
+func startMailpit(t *testing.T, ctx context.Context, instance int) (smtpAddr, apiURL string) {
 	t.Helper()
 
-	if addr, api := os.Getenv("MAILPIT_SMTP_ADDR"), os.Getenv("MAILPIT_API_URL"); addr != "" && api != "" {
+	addrVar, apiVar := "MAILPIT_SMTP_ADDR", "MAILPIT_API_URL"
+	if instance > 1 {
+		addrVar = fmt.Sprintf("%s_%d", addrVar, instance)
+		apiVar = fmt.Sprintf("%s_%d", apiVar, instance)
+	}
+
+	if addr, api := os.Getenv(addrVar), os.Getenv(apiVar); addr != "" && api != "" {
 		// One server for the whole run, unlike the container case where each
 		// test gets its own. Empty it first, or a test counts the message the
 		// previous one sent and reports a leak that isn't.

@@ -106,7 +106,7 @@ ALLOWED_ORIGINS=https://www.example.com \
 | `ALLOWED_ORIGINS`     | _required_       | Comma-separated. A request from anywhere else is refused.                       |
 | `SMTP_ADDR`           | `localhost:1025` | `host:port` of the mail server.                                                 |
 | `SMTP_USERNAME`       | empty            | Omit for a local bridge that does not authenticate.                             |
-| `SMTP_PASSWORD`       | empty            |                                                                                 |
+| `SMTP_PASSWORD`       | empty            | Required if `SMTP_USERNAME` is set.                                             |
 | `RATE_LIMIT_PER_HOUR` | `5`              | Submissions per client address. `0` disables it.                                |
 | `FORMS_FILE`          | unset            | Path to a forms file. Setting it replaces the four variables above — see below. |
 | `ADDR`                | `:8080`          | Listen address.                                                                 |
@@ -120,22 +120,32 @@ Point `FORMS_FILE` at a YAML file. There is a commented example in
 [`forms.example.yaml`](forms.example.yaml):
 
 ```yaml
+smtp:
+  addr: smtp.eu.mailgun.org:587
+
 forms:
   - id: marketing
     origins:
       - https://www.example.com
       - https://example.com
-    from: site@example.com
+    from: postmaster@mg.example.com
     to: info@example.com
     subject: "Contact form: {{ .Name }}"
     rate_limit_per_hour: 5
+    smtp:
+      username: postmaster@mg.example.com
+      password_env: MAILGUN_EXAMPLE_COM
 
   - id: careers
     origins:
       - https://careers.example.org
-    from: site@example.com
-    to: jobs@example.com
+    from: postmaster@mg.example.org
+    to: jobs@example.org
     subject: "Application from {{ .Name }}"
+    smtp:
+      addr: smtp.mailgun.org:587
+      username: postmaster@mg.example.org
+      password_env: MAILGUN_EXAMPLE_ORG
 ```
 
 That serves `POST /contact/marketing` and `POST /contact/careers`. The `id` is
@@ -156,12 +166,37 @@ is whatever the visitor typed.
 `rate_limit_per_hour` defaults to 5. An explicit `0` turns the limit off, which
 is deliberately not the same as leaving the key out.
 
+### A login per domain
+
+`smtp` appears twice on purpose: once at the top of the file as the default, and
+once inside a form to override it field by field. A form that only sets a
+username keeps the shared address.
+
+It is per form because it has to be. Mailgun — and any provider that
+authenticates per sending domain — issues a separate login for each domain, so a
+service holding two domains holds two logins and cannot share one between them.
+The integration test proves this end to end by pointing two forms at two
+different mail servers and asserting that a submission to one never appears on
+the other.
+
+The password is the one thing that is not in the file. `password_env` names an
+environment variable to read it from, which is what lets the forms file live in
+git next to the site it serves:
+
+```sh
+MAILGUN_EXAMPLE_COM=... MAILGUN_EXAMPLE_ORG=... FORMS_FILE=/etc/form-handler/forms.yaml form-handler
+```
+
+If that variable is empty or unset, the service refuses to start. A missing
+secret should be a failed deploy while the old container is still running, not a
+form that silently stops sending. Use `password:` inline instead if you mount the
+whole file as a secret and would rather keep it self-contained — setting both is
+an error, because it is a question about which one wins.
+
 The forms file is the whole story once it exists: `MAIL_FROM`, `MAIL_TO`,
-`ALLOWED_ORIGINS` and `RATE_LIMIT_PER_HOUR` are ignored, because a
-half-file-half-environment configuration is the kind of thing that works locally
-and surprises you in production. The SMTP settings stay in the environment
-either way — a password does not belong in a file that wants to be committed
-next to the site it serves.
+`ALLOWED_ORIGINS`, `RATE_LIMIT_PER_HOUR` and the `SMTP_*` variables are all
+ignored, because a half-file-half-environment configuration is the kind of thing
+that works locally and surprises you in production.
 
 Everything in that file is checked at startup. An unknown key, a duplicate id, an
 origin with a path on it, an address that will not parse, a subject template with

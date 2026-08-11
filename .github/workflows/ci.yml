@@ -70,9 +70,19 @@ jobs:
         ports:
           - 1025:1025
           - 8025:8025
+      # A second one, because the test that proves each form sends through its
+      # own server needs two servers to tell apart. One would pass whether or
+      # not the per-form SMTP settings were being used at all.
+      mailpit2:
+        image: axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a
+        ports:
+          - 1026:1025
+          - 8026:8025
     env:
       MAILPIT_SMTP_ADDR: 127.0.0.1:1025
       MAILPIT_API_URL: http://127.0.0.1:8025
+      MAILPIT_SMTP_ADDR_2: 127.0.0.1:1026
+      MAILPIT_API_URL_2: http://127.0.0.1:8026
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -83,13 +93,19 @@ jobs:
         # "listening". Without this the first test races it and fails on an
         # empty mailbox that was never reachable.
         run: |
-          for _ in $(seq 1 30); do
-            if curl -fsS "$MAILPIT_API_URL/api/v1/messages" >/dev/null 2>&1; then
-              echo "Mailpit is up"; exit 0
+          for url in "$MAILPIT_API_URL" "$MAILPIT_API_URL_2"; do
+            up=""
+            for _ in $(seq 1 30); do
+              if curl -fsS "$url/api/v1/messages" >/dev/null 2>&1; then
+                up=yes; break
+              fi
+              sleep 1
+            done
+            if [ -z "$up" ]; then
+              echo "Mailpit at $url never came up"; exit 1
             fi
-            sleep 1
+            echo "Mailpit at $url is up"
           done
-          echo "Mailpit never came up"; exit 1
       - name: go test -tags=integration
         run: go test -race -tags=integration ./...
 

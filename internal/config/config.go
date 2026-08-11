@@ -31,6 +31,7 @@ const (
 	DefaultRateLimitPerHour = 5
 	DefaultAddr             = ":8080"
 	DefaultSMTPAddr         = "localhost:1025"
+	DefaultSMTPTimeout      = 10 * time.Second
 	// DefaultFormID is the form that /contact resolves to, and the id the
 	// environment-configured form is given.
 	DefaultFormID = "default"
@@ -39,12 +40,13 @@ const (
 // Config is the whole of what the service was told to do.
 type Config struct {
 	Addr  string
-	SMTP  SMTP
 	Forms []Form
 }
 
-// SMTP is the one mail server everything sends through. Shared rather than per
-// form: the forms differ in who they are for, not in how the mail leaves.
+// SMTP is how one form's mail leaves. Per form rather than shared, because a
+// provider that authenticates per sending domain — Mailgun does — issues a
+// separate login for each one, and a service holding two domains therefore
+// holds two logins.
 type SMTP struct {
 	Addr     string
 	Username string
@@ -52,8 +54,8 @@ type SMTP struct {
 	Timeout  time.Duration
 }
 
-// Form is one configured form: where its submissions may come from, and where
-// they go.
+// Form is one configured form: where its submissions may come from, where they
+// go, and which login sends them.
 type Form struct {
 	ID               string
 	Origins          []string
@@ -61,6 +63,7 @@ type Form struct {
 	To               string
 	Subject          string
 	RateLimitPerHour int
+	SMTP             SMTP
 }
 
 // formID is what may appear as the last path segment of the endpoint. Kept
@@ -76,15 +79,7 @@ var formID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 // both /contact and /contact/default, which is what a one-site deployment wants
 // and what every version before multi-form support did.
 func Load() (Config, error) {
-	cfg := Config{
-		Addr: env("ADDR", DefaultAddr),
-		SMTP: SMTP{
-			Addr:     env("SMTP_ADDR", DefaultSMTPAddr),
-			Username: os.Getenv("SMTP_USERNAME"),
-			Password: os.Getenv("SMTP_PASSWORD"),
-			Timeout:  10 * time.Second,
-		},
-	}
+	cfg := Config{Addr: env("ADDR", DefaultAddr)}
 
 	if path := os.Getenv("FORMS_FILE"); path != "" {
 		forms, err := LoadForms(path)
@@ -110,6 +105,12 @@ func formFromEnv() (Form, error) {
 		From:    os.Getenv("MAIL_FROM"),
 		To:      os.Getenv("MAIL_TO"),
 		Subject: contact.DefaultSubject,
+		SMTP: SMTP{
+			Addr:     env("SMTP_ADDR", DefaultSMTPAddr),
+			Username: os.Getenv("SMTP_USERNAME"),
+			Password: os.Getenv("SMTP_PASSWORD"),
+			Timeout:  DefaultSMTPTimeout,
+		},
 	}
 
 	// Ordered, not a map: which variable a person is told about first should not
@@ -169,7 +170,20 @@ func LoadForms(path string) ([]Form, error) {
 // format is something this package can change independently of what the rest of
 // the service passes around.
 type yamlFile struct {
+	// Defaults for every form, so a deployment whose forms share a server does
+	// not repeat it once per form.
+	SMTP  *yamlSMTP  `yaml:"smtp"`
 	Forms []yamlForm `yaml:"forms"`
+}
+
+type yamlSMTP struct {
+	Addr     string `yaml:"addr"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	// PasswordEnv names an environment variable holding the password, which is
+	// how a forms file stays committable: it says which secret to use without
+	// being a file that contains one.
+	PasswordEnv string `yaml:"password_env"`
 }
 
 type yamlForm struct {
@@ -181,6 +195,72 @@ type yamlForm struct {
 	// A pointer, because an omitted rate limit and an explicit 0 mean different
 	// things: take the default, versus turn the limit off.
 	RateLimitPerHour *int `yaml:"rate_limit_per_hour"`
+	// Overrides the file-level smtp block, field by field. A provider that
+	// authenticates per sending domain gives each form its own login here.
+	SMTP *yamlSMTP `yaml:"smtp"`
+}
+
+// resolveSMTP layers a form's SMTP block over the file's defaults, then reads
+// whichever password was named. Field by field, so a form that only overrides
+// the username keeps the shared address.
+func resolveSMTP(defaults, form *yamlSMTP, where string) (SMTP, error) {
+	merged := yamlSMTP{}
+	for _, layer := range []*yamlSMTP{defaults, form} {
+		if layer == nil {
+			continue
+		}
+		if layer.Addr != "" {
+			merged.Addr = layer.Addr
+		}
+		if layer.Username != "" {
+			merged.Username = layer.Username
+		}
+		if layer.Password != "" {
+			merged.Password = layer.Password
+			merged.PasswordEnv = ""
+		}
+		if layer.PasswordEnv != "" {
+			merged.PasswordEnv = layer.PasswordEnv
+			merged.Password = ""
+		}
+	}
+
+	// Both set in the same layer is a question about which one wins, and any
+	// answer would be somebody's surprise.
+	if form != nil && form.Password != "" && form.PasswordEnv != "" {
+		return SMTP{}, fmt.Errorf("%s: smtp: set password or password_env, not both", where)
+	}
+	if defaults != nil && defaults.Password != "" && defaults.PasswordEnv != "" {
+		return SMTP{}, fmt.Errorf("smtp: set password or password_env, not both")
+	}
+
+	out := SMTP{
+		Addr:     merged.Addr,
+		Username: merged.Username,
+		Password: merged.Password,
+		Timeout:  DefaultSMTPTimeout,
+	}
+	if out.Addr == "" {
+		out.Addr = DefaultSMTPAddr
+	}
+
+	if merged.PasswordEnv != "" {
+		// Fail here rather than on the first submission. A missing secret is a
+		// deployment mistake, and the useful moment to hear about it is while
+		// the old container is still running.
+		out.Password = os.Getenv(merged.PasswordEnv)
+		if out.Password == "" {
+			return SMTP{}, fmt.Errorf("%s: smtp: %s is empty or unset", where, merged.PasswordEnv)
+		}
+	}
+
+	// Mailgun and friends refuse the session outright, which would otherwise
+	// surface one failed submission at a time.
+	if out.Username != "" && out.Password == "" {
+		return SMTP{}, fmt.Errorf("%s: smtp: username is set but no password is", where)
+	}
+
+	return out, nil
 }
 
 // ParseForms reads a forms file and returns the forms it describes.
@@ -196,7 +276,17 @@ func ParseForms(r io.Reader) ([]Form, error) {
 	}
 
 	forms := make([]Form, 0, len(file.Forms))
-	for _, f := range file.Forms {
+	for i, f := range file.Forms {
+		where := fmt.Sprintf("form %d", i)
+		if f.ID != "" {
+			where = fmt.Sprintf("form %q", f.ID)
+		}
+
+		smtp, err := resolveSMTP(file.SMTP, f.SMTP, where)
+		if err != nil {
+			return nil, err
+		}
+
 		form := Form{
 			ID:               f.ID,
 			Origins:          f.Origins,
@@ -204,6 +294,7 @@ func ParseForms(r io.Reader) ([]Form, error) {
 			To:               f.To,
 			Subject:          f.Subject,
 			RateLimitPerHour: DefaultRateLimitPerHour,
+			SMTP:             smtp,
 		}
 		if strings.TrimSpace(form.Subject) == "" {
 			form.Subject = contact.DefaultSubject

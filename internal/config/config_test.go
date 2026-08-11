@@ -181,10 +181,118 @@ forms:
 	}
 }
 
+// Mailgun gives every sending domain its own login, so the credentials are a
+// property of the form rather than of the service.
+func TestEachFormCanHaveItsOwnLogin(t *testing.T) {
+	t.Setenv("MAILGUN_EXAMPLE_COM", "secret-for-com")
+	t.Setenv("MAILGUN_EXAMPLE_ORG", "secret-for-org")
+
+	forms, err := parse(t, `
+smtp:
+  addr: smtp.eu.mailgun.org:587
+
+forms:
+  - id: marketing
+    origins: ["https://www.example.com"]
+    from: postmaster@mg.example.com
+    to: info@example.com
+    smtp:
+      username: postmaster@mg.example.com
+      password_env: MAILGUN_EXAMPLE_COM
+  - id: careers
+    origins: ["https://careers.example.org"]
+    from: postmaster@mg.example.org
+    to: jobs@example.org
+    smtp:
+      addr: smtp.mailgun.org:587
+      username: postmaster@mg.example.org
+      password_env: MAILGUN_EXAMPLE_ORG
+`)
+
+	require.NoError(t, err)
+	require.Len(t, forms, 2)
+
+	// The top-level block is the default, so a form that does not name a
+	// server inherits it rather than repeating it.
+	assert.Equal(t, "smtp.eu.mailgun.org:587", forms[0].SMTP.Addr)
+	assert.Equal(t, "postmaster@mg.example.com", forms[0].SMTP.Username)
+	assert.Equal(t, "secret-for-com", forms[0].SMTP.Password)
+
+	// And a form that does name one overrides it.
+	assert.Equal(t, "smtp.mailgun.org:587", forms[1].SMTP.Addr)
+	assert.Equal(t, "postmaster@mg.example.org", forms[1].SMTP.Username)
+	assert.Equal(t, "secret-for-org", forms[1].SMTP.Password)
+}
+
+// The point of password_env: the forms file describes which secret to use
+// without being a file that holds secrets, so it can live next to the site.
+func TestAMissingPasswordVariableIsRefusedAtStartup(t *testing.T) {
+	_, err := parse(t, `
+forms:
+  - id: marketing
+    origins: ["https://www.example.com"]
+    from: postmaster@mg.example.com
+    to: info@example.com
+    smtp:
+      username: postmaster@mg.example.com
+      password_env: MAILGUN_NOT_SET
+`)
+
+	require.Error(t, err, "an unset password variable started anyway")
+	assert.Contains(t, err.Error(), "MAILGUN_NOT_SET")
+}
+
+func TestSMTPConfigIsRejectedWhenItCannotWork(t *testing.T) {
+	t.Setenv("MAILGUN_EXAMPLE_COM", "secret")
+
+	cases := map[string]struct {
+		smtp string
+		want string
+	}{
+		// Two sources for one secret is a question about which one won.
+		"both password and password_env": {`
+      username: postmaster@mg.example.com
+      password: inline-secret
+      password_env: MAILGUN_EXAMPLE_COM`, "password"},
+		// Mailgun refuses the session, and the failure arrives per submission
+		// rather than at startup where it belongs.
+		"username with no password": {`
+      username: postmaster@mg.example.com`, "password"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := parse(t, `
+forms:
+  - id: marketing
+    origins: ["https://www.example.com"]
+    from: postmaster@mg.example.com
+    to: info@example.com
+    smtp:`+tc.smtp+"\n")
+
+			require.Error(t, err)
+			assert.Contains(t, strings.ToLower(err.Error()), tc.want)
+		})
+	}
+}
+
+// A form that says nothing about SMTP still has to end up with somewhere to
+// send, or the service starts and then fails one submission at a time.
+func TestAFormWithNoSMTPBlockTakesTheDefaultServer(t *testing.T) {
+	forms, err := parse(t, twoForms)
+
+	require.NoError(t, err)
+	assert.Equal(t, config.DefaultSMTPAddr, forms[0].SMTP.Addr)
+	assert.Empty(t, forms[0].SMTP.Username, "a default server needs no login")
+}
+
 func TestFormsFromEnvironmentBecomeTheDefaultForm(t *testing.T) {
 	t.Setenv("MAIL_FROM", "site@example.com")
 	t.Setenv("MAIL_TO", "info@example.com")
 	t.Setenv("ALLOWED_ORIGINS", "https://www.example.com, https://example.com")
+
+	t.Setenv("SMTP_USERNAME", "postmaster@mg.example.com")
+	t.Setenv("SMTP_PASSWORD", "secret")
 
 	cfg, err := config.Load()
 
@@ -194,6 +302,9 @@ func TestFormsFromEnvironmentBecomeTheDefaultForm(t *testing.T) {
 	assert.Equal(t, config.DefaultFormID, cfg.Forms[0].ID)
 	assert.Equal(t, []string{"https://www.example.com", "https://example.com"}, cfg.Forms[0].Origins)
 	assert.Equal(t, "info@example.com", cfg.Forms[0].To)
+	// One form, one login, still carried on the form itself.
+	assert.Equal(t, "postmaster@mg.example.com", cfg.Forms[0].SMTP.Username)
+	assert.Equal(t, "secret", cfg.Forms[0].SMTP.Password)
 }
 
 // There is no sensible default for "who may post to this", and guessing one
