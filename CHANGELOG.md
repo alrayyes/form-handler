@@ -11,6 +11,13 @@ alone.
 
 <!-- releases below -->
 
+## v2.1.0
+
+### Features
+* 5a1f0d69625fc604be8699ed41d728155f0f71cb feat: log every request, not only the ones a form handled
+### Everything else
+* 62112af813d14defe4c0e2fcfb6e3a3b17c8d2ec Merge pull request #13 from alrayyes/feat/access-log
+
 ## v2.0.0
 
 ### Fixes
