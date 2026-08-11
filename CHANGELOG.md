@@ -11,6 +11,11 @@ alone.
 
 <!-- releases below -->
 
+## v2.1.1
+
+### Fixes
+*  fix(build): drop the commit hashes from the changelog
+
 ## v2.1.0
 
 ### Features
