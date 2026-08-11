@@ -39,7 +39,7 @@ To work on it, additionally:
 - **[lefthook](https://lefthook.dev)** for the git hooks, and
   **[bun](https://bun.sh)** to install the linters that are not Go — commitlint,
   Prettier and markdownlint. There is a `package.json`, but nothing here is
-  JavaScript; it exists only so those resolve.
+  JavaScript; it exists only so those tools resolve.
 - **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
   hook runs from your `PATH` while CI runs it pinned. Install that version
   rather than whichever is current: when the two disagree, the hook passes and
@@ -157,7 +157,7 @@ digits, `-` and `_`.
 `origins` is per form on purpose. A site being allowed to use its own form must
 not let it use somebody else's, and the integration test asserts exactly that.
 Each entry is `scheme://host[:port]` and nothing after it, which is all a
-browser ever sends in an `Origin` header — `www.example.com` and `example.com`
+browser ever sends in the `Origin` header — `www.example.com` and `example.com`
 are different origins, so list both if you serve both.
 
 `subject` is a Go [text/template](https://pkg.go.dev/text/template) over

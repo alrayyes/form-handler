@@ -47,8 +47,12 @@ jobs:
           url="https://github.com/ltex-plus/ltex-ls-plus/releases/download/${LTEX_VERSION}/ltex-ls-plus-${LTEX_VERSION}-linux-x64.tar.gz"
           curl -fsSL "$url" -o ltex.tar.gz
           mkdir -p "$RUNNER_TEMP/ltex"
-          tar -xzf ltex.tar.gz -C "$RUNNER_TEMP/ltex" --strip-components=1
-          echo "$RUNNER_TEMP/ltex/bin" >> "$GITHUB_PATH"
+          # No --strip-components: the archive has a leading "./" entry, so
+          # stripping one component removes that rather than the version
+          # directory and the binary ends up somewhere nobody looks.
+          tar -xzf ltex.tar.gz -C "$RUNNER_TEMP/ltex"
+          echo "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}/bin" >> "$GITHUB_PATH"
+          ls "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}/bin"
 
       - name: Check the prose this repository owns
         # CODE_OF_CONDUCT.md is the Contributor Covenant verbatim; correcting
@@ -58,7 +62,9 @@ jobs:
         # for a specific code would pass a failing document, so this tests for
         # non-zero.
         run: |
-          set -uo pipefail
+          # +e because the step already runs under bash -e, which would kill it
+          # on ltex's non-zero exit before the check below could read it.
+          set +e
           files=$(git ls-files '*.md' | grep -v '^CODE_OF_CONDUCT.md$' | grep -v '^CHANGELOG.md$')
           echo "Checking:"; echo "$files"
 
@@ -93,7 +99,10 @@ jobs:
 
       - name: Vale
         run: |
-          set -uo pipefail
+          # Vale exits non-zero whenever it has anything to say, warnings
+          # included, and the step runs under bash -e. Without this it dies
+          # before the grep that decides whether any of it was worth failing on.
+          set +e
           vale --output=line . | tee vale.txt
           # Errors are the tier worth failing on — a misspelt product name or a
           # term this repository has already decided how to spell. Warnings are

@@ -1,34 +1,61 @@
 {
-  "en-US": {
-    "dictionary": [
+  "ltex.language": "en-GB",
+  "ltex.dictionary": {
+    "en-GB": [
+      "CIDRs",
       "Cloudflare",
       "CodeQL",
       "Dependabot",
       "GHCR",
       "Mailgun",
       "Mailpit",
+      "Renovate",
+      "Scorecard",
       "Traefik",
+      "WAF",
+      "allowlist",
+      "bunx",
+      "changelog",
       "commitlint",
       "distroless",
-      "goreleaser",
+      "entrypoint",
+      "fixups",
       "golangci",
+      "golangci-lint",
+      "goreleaser",
       "healthcheck",
       "honeypot",
+      "ko",
       "lefthook",
       "markdownlint",
+      "nginx",
       "pflag",
+      "pre-commit",
       "proselint",
       "qemu",
       "ruleset",
       "rulesets",
       "svu",
       "testcontainers",
-      "unmergeable"
-    ],
-    "disabledRules": [
+      "unmergeable",
+      "unshare"
+    ]
+  },
+  "ltex.disabledRules": {
+    "en-GB": [
       "PASSIVE_VOICE",
-      "OXFORD_SPELLING_Z_NOT_S",
-      "MORFOLOGIK_RULE_EN_US"
+      "A_INFINITIVE",
+      "ENGLISH_WORD_REPEAT_BEGINNING_RULE",
+      "WHETHER",
+      "DASH_RULE",
+      "EN_QUOTES",
+      "UPPERCASE_SENTENCE_START",
+      "SENT_START_CONJUNCTIVE_LINKING_ADVERB_COMMA",
+      "ID_CASING",
+      "PREPOSITION_VERB",
+      "COMMA_COMPOUND_SENTENCE",
+      "COMMA_COMPOUND_SENTENCE_2",
+      "OXFORD_SPELLING_Z_NOT_S"
     ]
   }
 }
