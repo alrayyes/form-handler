@@ -1,0 +1,41 @@
+# OpenSSF Scorecard grades the repository's own supply chain — pinned actions,
+# branch protection, token permissions, whether releases are signed. It is the
+# check that notices when a habit slips, which is exactly the sort of thing
+# nobody reviews for.
+name: scorecard
+
+on:
+  branch_protection_rule:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "41 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyse:
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write # uploads the findings to the Security tab
+      id-token: write # signs the published result
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publishes the score so the badge in the README has something to
+          # read. Only works on a public repository, which this is.
+          publish_results: true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+      - uses: github/codeql-action/upload-sarif@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
+        with:
+          sarif_file: results.sarif

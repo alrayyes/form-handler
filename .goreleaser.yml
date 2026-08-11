@@ -57,10 +57,3 @@ release:
   # Notes come from the changelog section above rather than from whatever the
   # tag message happened to say.
   mode: replace
-
-github_urls:
-  api: https://api.github.com
-  download: https://github.com
-  # Self-hosted GitHub wants release assets in the generic package registry;
-  # uploading them as bare release files is the path that quietly 404s.
-  use_package_registry: true

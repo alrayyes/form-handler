@@ -1,0 +1,42 @@
+# Static analysis for the classes of bug a linter does not look for — tainted
+# input reaching somewhere it should not, mostly, which is the shape of every
+# interesting bug a public form endpoint has.
+name: codeql
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    # Weekly, because the queries improve even when the code does not.
+    - cron: "27 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyse:
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: github/codeql-action/init@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
+        with:
+          languages: go
+          # The extra queries are the point: the default set alone is close to
+          # what golangci-lint already reports.
+          queries: security-and-quality
+      - uses: github/codeql-action/autobuild@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
+      - uses: github/codeql-action/analyze@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
+        with:
+          category: /language:go

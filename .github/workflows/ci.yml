@@ -1,0 +1,151 @@
+# The gate. Every command in here has a twin in lefthook.yml, so a green
+# pre-commit means a green pipeline and neither can drift into being the only
+# place a rule is enforced.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Least privilege by default. A job that needs more says so itself.
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The same version the pre-commit hook runs. When these two disagree the hook
+  # passes and the pipeline fails, and the reason is not obvious from the failure.
+  GOLANGCI_LINT_VERSION: v2.12.2
+  # Pinned by digest like every other image this repo pulls: a tag can be moved
+  # under you, and a mail server that quietly changed version underneath the one
+  # test that proves delivery works is a confusing way to spend an afternoon.
+  MAILPIT_IMAGE: axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+      - name: gofmt
+        # golangci-lint's formatter reports rather than rewrites here; this is
+        # the check that a file was committed unformatted.
+        run: gofmt -l . | (! grep .)
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: go test
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Report coverage
+        run: |
+          go tool cover -func=coverage.out | tail -1 |
+            awk '{ print "**Coverage: " $3 "**" }' >> "$GITHUB_STEP_SUMMARY"
+
+  # The outer test, and the one to trust. It posts real requests at the real
+  # composition root and asserts real messages arrived in the right inboxes.
+  integration:
+    runs-on: ubuntu-24.04
+    services:
+      mailpit:
+        # testcontainers would start this itself, but it needs a Docker daemon
+        # inside the job to do it. Running Mailpit as an ordinary service
+        # container and pointing the test at it needs no daemon and asserts
+        # exactly the same things — see startMailpit for the long version.
+        image: axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      MAILPIT_SMTP_ADDR: 127.0.0.1:1025
+      MAILPIT_API_URL: http://127.0.0.1:8025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Wait for Mailpit
+        # The service container is started before the job, but "started" is not
+        # "listening". Without this the first test races it and fails on an
+        # empty mailbox that was never reachable.
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS "$MAILPIT_API_URL/api/v1/messages" >/dev/null 2>&1; then
+              echo "Mailpit is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Mailpit never came up"; exit 1
+      - name: go test -tags=integration
+        run: go test -race -tags=integration ./...
+
+  # Layout first, then structure. Prettier decides what the Markdown looks like
+  # and markdownlint judges what Prettier produced; the other order has
+  # markdownlint fixing something Prettier is about to overwrite.
+  prose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: bun install
+        # Frozen, so a drifted lockfile fails the job rather than silently
+        # resolving to something nobody committed.
+        run: bun install --frozen-lockfile
+      - name: prettier --check
+        run: bunx prettier --check "**/*.md"
+      - name: markdownlint
+        run: bunx markdownlint-cli2
+
+  # A hook is something you can skip, and the version number depends on these
+  # messages being right, so the whole branch is checked here as well.
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: commitlint
+        run: |
+          bunx commitlint \
+            --from "${{ github.event.pull_request.base.sha }}" \
+            --to "${{ github.event.pull_request.head.sha }}" \
+            --verbose
+
+  # Proves the image still builds before anyone merges, without publishing
+  # anything. The release workflow builds it the same way and does push.
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: ko-build/setup-ko@61b4d1d396f5b2e7d6bb6fefdce3dc38d1a13445 # v0.10
+        with:
+          version: v0.19.1
+      - name: ko build
+        env:
+          KO_DOCKER_REPO: ko.local
+          VERSION: ci
+        run: ko build --bare --push=false ./
