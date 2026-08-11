@@ -11,6 +11,19 @@ alone.
 
 <!-- releases below -->
 
+## v1.2.0
+
+### Features
+* cd24215ba18231398ecbe979c4062d76c728c99d feat(cli): parse arguments with cobra
+* a97ee000356c5009d501950913da3f7dea70fd4c feat: send through Mailgun as well as SMTP
+### Fixes
+* cef0a72a4e7bb71bf1343ed8c079d1d8c8d58301 fix(cli): report a failure once rather than twice
+### Everything else
+* ba42568604ef7a557a6eecf829ef80bdcaeec97e Merge pull request #4 from alrayyes/feat/cobra-cli
+* d3276ed0787adbb4ed77a2f123df9e5308e98ae5 Merge pull request #5 from alrayyes/feat/mailgun
+* 052fcb468d74cc4996624d399acdfa79e8b869f1 ci: lint the integration tests as well
+* 836d79f08fd88ab1d7372de7d297157225a20bdb test(cli): pin the single-dash flags against a real probe
+
 ## v1.1.0
 
 ### Features
