@@ -145,7 +145,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
 		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
-			"reason", "honeypot", "ip", clientIP(r), "origin", clip(origin))
+			"reason", "honeypot", "ip", safeLogValue(clientIP(r)), "origin", safeLogValue(clip(origin)))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
 	case err != nil:
@@ -233,6 +233,14 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// safeLogValue removes line breaks so user-controlled values cannot forge
+// additional log entries.
+func safeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
 }
 
 // clientIP prefers X-Forwarded-For's first entry, because this runs behind
