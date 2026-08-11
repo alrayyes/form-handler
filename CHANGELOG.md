@@ -11,6 +11,16 @@ alone.
 
 <!-- releases below -->
 
+## v1.3.0
+
+### Features
+* 2dcd94575334674d4f5b98929e7739b0ced4b641 feat: log refused submissions, not just accepted ones
+### Fixes
+* 44240b3cba59646dd4089fb55a0c2ba47c4c898c fix(security): clean every user-supplied value that reaches a log
+* a3d0a05674366299bdfe05b8fd808f3087eedcc2 fix(security): strip line breaks from logged values
+### Everything else
+* 48f865e536b758ca16b0ba6ae6705b116fd62799 Merge pull request #8 from alrayyes/feat/log-refusals
+
 ## v1.2.0
 
 ### Features
