@@ -9,3 +9,7 @@ go.sum
 
 # Written by the release job, not by hand.
 CHANGELOG.md
+
+# Vale's downloaded style packages.
+styles/Google/
+styles/proselint/

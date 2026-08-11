@@ -1,0 +1,34 @@
+{
+  "en-US": {
+    "dictionary": [
+      "Cloudflare",
+      "CodeQL",
+      "Dependabot",
+      "GHCR",
+      "Mailgun",
+      "Mailpit",
+      "Traefik",
+      "commitlint",
+      "distroless",
+      "goreleaser",
+      "golangci",
+      "healthcheck",
+      "honeypot",
+      "lefthook",
+      "markdownlint",
+      "pflag",
+      "proselint",
+      "qemu",
+      "ruleset",
+      "rulesets",
+      "svu",
+      "testcontainers",
+      "unmergeable"
+    ],
+    "disabledRules": [
+      "PASSIVE_VOICE",
+      "OXFORD_SPELLING_Z_NOT_S",
+      "MORFOLOGIK_RULE_EN_US"
+    ]
+  }
+}

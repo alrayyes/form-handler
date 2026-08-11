@@ -2,3 +2,9 @@
 /dist
 /node_modules
 /.bun-cache
+
+# Vale's style packages are downloaded by `vale sync`, not committed. Ignored by
+# name rather than as styles/ wholesale — styles/config/ is ours and belongs in
+# the repository.
+/styles/Google/
+/styles/proselint/

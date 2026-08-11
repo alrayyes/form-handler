@@ -1,0 +1,2 @@
+# Words this repository does not use. Nothing yet — the styles cover the usual
+# suspects, and a reject list that duplicates them just fails twice.

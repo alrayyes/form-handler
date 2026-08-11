@@ -28,6 +28,13 @@ pre-commit:
       glob: "*.md"
       run: bunx markdownlint-cli2 {staged_files}
 
+    # Fast enough for a commit. LTeX is not — it ships its own Java runtime and
+    # is a ~300 MB download — so mechanics are checked in CI and by the editor
+    # over LSP, not here.
+    - name: vale
+      glob: "*.md"
+      run: vale {staged_files}
+
 commit-msg:
   jobs:
     # Resolved from node_modules rather than fetched by bunx: commitlint has to

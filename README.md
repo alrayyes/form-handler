@@ -1,6 +1,6 @@
 # form-handler
 
-[![ci](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml)
+[![CI](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/alrayyes/form-handler?sort=semver)](https://github.com/alrayyes/form-handler/releases/latest)
 [![image](https://img.shields.io/badge/ghcr.io-form--handler-2496ED?logo=docker&logoColor=white)](https://github.com/alrayyes/form-handler/pkgs/container/form-handler)
 [![scorecard](https://api.securityscorecards.dev/projects/github.com/alrayyes/form-handler/badge)](https://scorecard.dev/viewer/?uri=github.com/alrayyes/form-handler)
@@ -388,7 +388,7 @@ flooding the form, is worth noticing. A visitor mistyping their address is
 `INFO`.
 
 **This is how you tell whether a missing submission was refused here or never
-arrived.** A form that stops working has two very different causes with
+arrived.** A form that stops working has two quite different causes with
 identical symptoms: something in front of this service — Cloudflare, a proxy —
 turning the request away, or this service refusing it on the origin check. Post
 a test submission and look:
