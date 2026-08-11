@@ -7,11 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/alrayyes/form-handler/internal/logsafe"
 )
 
 // Handler serves one form's endpoint. One per configured form, each with its
@@ -135,7 +139,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// The decoder's own message names the offending field for an unknown
 		// one, which is the difference between "their form is out of date" and
 		// "somebody is poking at this".
-		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "could not read submission"}, "detail", clip(err.Error()))
+		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "could not read submission"}, "detail", logsafe.String(err.Error()))
 		return
 	}
 
@@ -145,7 +149,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
 		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
-			"reason", "honeypot", "ip", safeLogValue(clientIP(r)), "origin", safeLogValue(clip(origin)))
+			"reason", "honeypot", "ip", clientIP(r), "origin", logsafe.String(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
 	case err != nil:
@@ -176,14 +180,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.Info("sent message", "form", h.form.ID, "status", http.StatusAccepted, "from", msg.Email)
+	h.log.Info("sent message", "form", h.form.ID, "status", http.StatusAccepted,
+		"from", logsafe.String(msg.Email))
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 }
-
-// maxLoggedHeader bounds a header before it reaches a log line. Origin and
-// CF-Ray are whatever the sender put in them, and an unbounded one turns a log
-// file into somewhere to write a novel.
-const maxLoggedHeader = 200
 
 // refuse answers a request this form will not accept, and says so in the log.
 //
@@ -206,27 +206,19 @@ func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, bod
 		"status", status,
 		"reason", body.Error,
 		"ip", clientIP(r),
-		"origin", clip(r.Header.Get("Origin")),
+		"origin", logsafe.String(r.Header.Get("Origin")),
 	}
 	// Cloudflare stamps every request it forwards. Carrying it means a line
 	// here can be matched against Cloudflare's own log for the same request,
 	// which is how you find out whether something in front of this service is
 	// answering on its behalf.
 	if ray := r.Header.Get("CF-Ray"); ray != "" {
-		attrs = append(attrs, "cf_ray", clip(ray))
+		attrs = append(attrs, "cf_ray", logsafe.String(ray))
 	}
 	attrs = append(attrs, extra...)
 
 	h.log.Log(r.Context(), level, "refused submission", attrs...)
 	writeJSON(w, status, body)
-}
-
-// clip bounds an attacker-controlled string on its way to a log line.
-func clip(v string) string {
-	if len(v) <= maxLoggedHeader {
-		return v
-	}
-	return v[:maxLoggedHeader] + "…"
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -235,29 +227,28 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// safeLogValue removes line breaks so user-controlled values cannot forge
-// additional log entries.
-func safeLogValue(v string) string {
-	v = strings.ReplaceAll(v, "\n", "")
-	v = strings.ReplaceAll(v, "\r", "")
-	return v
-}
-
-// clientIP prefers X-Forwarded-For's first entry, because this runs behind
-// Traefik and RemoteAddr would otherwise be the proxy for every visitor —
-// which would rate-limit the whole internet as one client.
+// clientIP prefers X-Forwarded-For's first entry, because this runs behind a
+// proxy and RemoteAddr would otherwise be the proxy for every visitor — which
+// would rate-limit the whole internet as one client.
+//
+// Whatever comes back has parsed as an address. That header is set by whoever
+// sent the request, so without this the limiter is keyed on arbitrary strings
+// and the log carries them too. Note that this makes the value well-formed, not
+// truthful: believing it at all is what issue #6 is about.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if first, _, found := strings.Cut(xff, ","); found {
-			return strings.TrimSpace(first)
+		first, _, _ := strings.Cut(xff, ",")
+		if addr, err := netip.ParseAddr(strings.TrimSpace(first)); err == nil {
+			return addr.String()
 		}
-		return strings.TrimSpace(xff)
 	}
-	host, _, found := strings.Cut(r.RemoteAddr, ":")
-	if !found {
-		return r.RemoteAddr
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
 	}
-	return host
+	if addr, err := netip.ParseAddr(r.RemoteAddr); err == nil {
+		return addr.String()
+	}
+	return "unknown"
 }
 
 // limiter is a fixed window per client. Deliberately in memory and deliberately

@@ -145,6 +145,44 @@ func TestHeadersReachingTheLogAreBounded(t *testing.T) {
 
 // Accepting still says so, and the honeypot still looks like an acceptance from
 // outside while being distinguishable from inside.
+// The attack the log-injection warnings describe: a newline in a logged value
+// lets whoever sent it append what looks like another entry, so a refused
+// request can claim in the log that it succeeded.
+func TestARefusalCannotForgeASecondLogEntry(t *testing.T) {
+	h, lines := capture(t, 100)
+
+	req := httptest.NewRequest(http.MethodPost, "/contact/marketing", strings.NewReader(goodBody))
+	req.Header.Set("Origin", "https://evil.example\n{\"level\":\"INFO\",\"msg\":\"sent message\",\"status\":202}")
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+
+	entries := lines()
+	require.Len(t, entries, 1, "a header wrote its own log entry")
+	assert.Equal(t, "refused submission", entries[0]["msg"])
+	origin, ok := entries[0]["origin"].(string)
+	require.True(t, ok)
+	assert.NotContains(t, origin, "\n")
+}
+
+// X-Forwarded-For is set by whoever sent the request, so without checking it
+// the limiter is keyed on arbitrary strings and the log carries them.
+func TestAClientAddressIsAlwaysAnAddress(t *testing.T) {
+	h, lines := capture(t, 100)
+
+	req := httptest.NewRequest(http.MethodPost, "/contact/marketing", strings.NewReader(goodBody))
+	req.Header.Set("Origin", "https://someone-else.example")
+	req.Header.Set("X-Forwarded-For", "not-an-address\nforged")
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+
+	entries := lines()
+	require.Len(t, entries, 1)
+	ip, ok := entries[0]["ip"].(string)
+	require.True(t, ok)
+	assert.NotContains(t, ip, "forged")
+	assert.NotContains(t, ip, "not-an-address")
+}
+
 func TestAcceptedSubmissionsAreStillLogged(t *testing.T) {
 	h, lines := capture(t, 100)
 

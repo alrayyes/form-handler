@@ -13,6 +13,7 @@ import (
 
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/logsafe"
 	"github.com/alrayyes/form-handler/internal/mail/mailgun"
 	"github.com/alrayyes/form-handler/internal/mail/smtp"
 )
@@ -66,8 +67,10 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 		log.Warn("refused submission",
 			"status", http.StatusNotFound,
 			"reason", "unknown form",
-			"path", r.URL.Path,
-			"origin", r.Header.Get("Origin"),
+			// Both are supplied by whoever sent the request, and both end up in
+			// a line somebody reads.
+			"path", logsafe.String(r.URL.Path),
+			"origin", logsafe.String(r.Header.Get("Origin")),
 		)
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown form"})
 	})
