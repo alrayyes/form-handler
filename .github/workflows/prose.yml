@@ -52,7 +52,19 @@ jobs:
           # directory and the binary ends up somewhere nobody looks.
           tar -xzf ltex.tar.gz -C "$RUNNER_TEMP/ltex"
           echo "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}/bin" >> "$GITHUB_PATH"
-          ls "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}/bin"
+
+          # The archive ships its own JDK 21 and the launcher prefers JAVA_HOME,
+          # which the runner has already pointed at Java 17. Without this it
+          # picks that up and dies on "class file version 65.0 ... only
+          # recognizes up to 61.0" — a Java error reported as a prose failure.
+          # Found by glob so a JDK bump upstream does not silently break it.
+          jdk=$(find "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}" -maxdepth 1 -type d -name 'jdk-*' | head -1)
+          if [ -z "$jdk" ]; then
+            echo "::error::no bundled JDK found in the ltex archive"
+            exit 1
+          fi
+          echo "JAVA_HOME=$jdk" >> "$GITHUB_ENV"
+          echo "Using bundled JDK at $jdk"
 
       - name: Check the prose this repository owns
         # CODE_OF_CONDUCT.md is the Contributor Covenant verbatim; correcting
