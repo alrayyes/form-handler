@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  analyse:
+  scorecard:
     runs-on: ubuntu-24.04
     permissions:
       security-events: write # uploads the findings to the Security tab
