@@ -11,6 +11,13 @@ alone.
 
 <!-- releases below -->
 
+## v1.3.2
+
+### Fixes
+* 523b32722bfe3f043ac2f459268fa2099ec78b79 fix(build): report the same version from the binary and the image
+### Everything else
+* b31720701571dee5c29984c39274c028e4a068a6 Merge pull request #11 from alrayyes/fix/version-string
+
 ## v1.3.1
 
 ### Fixes
