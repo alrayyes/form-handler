@@ -11,6 +11,14 @@ alone.
 
 <!-- releases below -->
 
+## v2.1.2
+
+### Fixes
+*  fix(ci): make the prose jobs actually run
+*  fix(ci): run ltex against the JDK it ships with
+### Everything else
+*  ci: check prose for mechanics and style, not only structure
+
 ## v2.1.1
 
 ### Fixes
