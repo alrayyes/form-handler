@@ -102,22 +102,16 @@ func newRootCommand(stdout io.Writer) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       version,
+		// Failures are returned, not logged here. cli() prints whatever comes
+		// back as "error: ...", so logging it as well reported everything
+		// twice — once as JSON on stdout and once as prose on stderr — and
+		// left whoever was reading them wondering whether two things had gone
+		// wrong or one thing had been said twice.
 		RunE: func(_ *cobra.Command, _ []string) error {
-			log := slog.New(slog.NewJSONHandler(stdout, nil))
-
 			if healthcheck {
-				if err := probe(); err != nil {
-					log.Error("healthcheck failed", "error", err)
-					return err
-				}
-				return nil
+				return probe()
 			}
-
-			if err := run(log); err != nil {
-				log.Error("exiting", "error", err)
-				return err
-			}
-			return nil
+			return run(slog.New(slog.NewJSONHandler(stdout, nil)))
 		},
 	}
 
