@@ -42,6 +42,15 @@ func String(v string) string {
 		return ""
 	}
 
+	// The line breaks come out first, by name. strings.Map below already drops
+	// them — they are control characters — so this is redundant for safety and
+	// is here to be read rather than to do work. CodeQL's log-injection query
+	// recognises this exact shape as a sanitiser and does not recognise a Map
+	// over unicode.IsControl, so without it the stronger cleaning below reads
+	// to the analyser as no cleaning at all, and every call site stays flagged.
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+
 	cleaned := strings.Map(func(r rune) rune {
 		// Drop the C0 and C1 control ranges, DEL, and anything that is not a
 		// valid rune to begin with. unicode.IsControl covers all of it.
