@@ -1,0 +1,59 @@
+name: Bug report
+description: Something does not do what it says it does
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If this is a security problem, please do not file it here — use
+        [private vulnerability reporting](https://github.com/alrayyes/form-handler/security/advisories/new)
+        instead. This service sends mail as somebody's domain, so a working
+        exploit in the open is a working exploit against every deployment.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce it
+      description: >
+        A request that reproduces it is worth more than a description of one.
+        Please redact real addresses.
+      render: shell
+      value: |
+        curl -i -X POST http://localhost:8080/contact/default \
+          -H 'Content-Type: application/json' \
+          -H 'Origin: https://www.example.com' \
+          -d '{"name":"Ada","email":"ada@example.com","message":"...","website":""}'
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: How it is configured
+      description: >
+        Your forms file or the MAIL_* variables, with the addresses and any
+        password taken out.
+      render: yaml
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What `form-handler -version` prints, or the image digest.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The JSON lines around the failure, if you have them.
+      render: shell

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/alrayyes/form-handler/security/advisories/new
+    about: Report it privately. Not as an issue — this service sends mail as somebody's domain.

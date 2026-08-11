@@ -1,0 +1,35 @@
+name: Feature request
+description: Something it should do and does not
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a contact form that turns submissions into email. That is
+        deliberately the whole job — a proposal that adds a database, a queue or
+        a dashboard is probably a different service rather than a change to this
+        one, and saying why it belongs here is most of the case.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The problem, not the solution. What are you unable to do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: If it changes configuration, sketch what the forms file would look like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >
+        Including "nothing" — but if a second deployment or a proxy rule already
+        solves it, that is worth knowing.
