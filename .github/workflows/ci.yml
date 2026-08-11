@@ -21,10 +21,6 @@ env:
   # The same version the pre-commit hook runs. When these two disagree the hook
   # passes and the pipeline fails, and the reason is not obvious from the failure.
   GOLANGCI_LINT_VERSION: v2.12.2
-  # Pinned by digest like every other image this repo pulls: a tag can be moved
-  # under you, and a mail server that quietly changed version underneath the one
-  # test that proves delivery works is a confusing way to spend an afternoon.
-  MAILPIT_IMAGE: axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a
 
 jobs:
   lint:
