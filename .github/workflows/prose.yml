@@ -1,0 +1,140 @@
+# The two tiers markdownlint does not cover.
+#
+# Layout is Prettier and structure is markdownlint, both in the ci workflow.
+# Those pass a document that reads badly: neither notices "an university", "the
+# the", or a paragraph that has quietly gone passive.
+#
+# Mechanics and style are separate jobs on purpose. When this goes red the job
+# name should say which tier failed, because a grammar mistake and a style
+# opinion are answered differently — one is wrong, the other is a suggestion.
+name: prose
+
+on:
+  push:
+    branches: [master]
+    paths: ["**/*.md", ".vale.ini", ".ltex.json", "styles/**", ".github/workflows/prose.yml"]
+  pull_request:
+    paths: ["**/*.md", ".vale.ini", ".ltex.json", "styles/**", ".github/workflows/prose.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prose-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned like everything else. Vale's style packages are versioned separately
+  # and fetched by `vale sync`.
+  VALE_VERSION: v3.17.1
+  LTEX_VERSION: 18.7.0
+
+jobs:
+  # Mechanics: grammar, spelling, the phonetic article. These have a right
+  # answer, so this one fails the build.
+  mechanics:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ltex-cli-plus
+        # From ltex-plus/ltex-ls-plus: the original valentjn/ltex-ls is no
+        # longer developed, and its binary is ltex-cli without the suffix. This
+        # archive ships its own Java, so there is nothing else to install.
+        run: |
+          set -euo pipefail
+          url="https://github.com/ltex-plus/ltex-ls-plus/releases/download/${LTEX_VERSION}/ltex-ls-plus-${LTEX_VERSION}-linux-x64.tar.gz"
+          curl -fsSL "$url" -o ltex.tar.gz
+          mkdir -p "$RUNNER_TEMP/ltex"
+          # No --strip-components: the archive has a leading "./" entry, so
+          # stripping one component removes that rather than the version
+          # directory and the binary ends up somewhere nobody looks.
+          tar -xzf ltex.tar.gz -C "$RUNNER_TEMP/ltex"
+          echo "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}/bin" >> "$GITHUB_PATH"
+
+          # The archive ships its own JDK 21 and the launcher prefers JAVA_HOME,
+          # which the runner has already pointed at Java 17. Without this it
+          # picks that up and dies on "class file version 65.0 ... only
+          # recognizes up to 61.0" — a Java error reported as a prose failure.
+          # Found by glob so a JDK bump upstream does not silently break it.
+          jdk=$(find "$RUNNER_TEMP/ltex/ltex-ls-plus-${LTEX_VERSION}" -maxdepth 1 -type d -name 'jdk-*' | head -1)
+          if [ -z "$jdk" ]; then
+            echo "::error::no bundled JDK found in the ltex archive"
+            exit 1
+          fi
+          echo "JAVA_HOME=$jdk" >> "$GITHUB_ENV"
+          echo "Using bundled JDK at $jdk"
+
+      - name: Check the prose this repository owns
+        # CODE_OF_CONDUCT.md is the Contributor Covenant verbatim; correcting
+        # somebody else's document is not this job's business.
+        #
+        # ltex-cli-plus exits 3 when it finds something, not 1. A job testing
+        # for a specific code would pass a failing document, so this tests for
+        # non-zero.
+        run: |
+          # +e because the step already runs under bash -e, which would kill it
+          # on ltex's non-zero exit before the check below could read it.
+          set +e
+          files=$(git ls-files '*.md' | grep -v '^CODE_OF_CONDUCT.md$' | grep -v '^CHANGELOG.md$')
+          echo "Checking:"; echo "$files"
+
+          # shellcheck disable=SC2086
+          ltex-cli-plus --client-configuration=.ltex.json $files
+          status=$?
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::ltex found grammar or spelling problems (exit $status)"
+            exit 1
+          fi
+
+  # Style: house voice, weasel words, passive drift. These are opinions, so this
+  # one reports and does not fail — style advice that blocks a merge teaches
+  # people --no-verify, which costs more than it catches.
+  style:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install Vale
+        env:
+          GOTOOLCHAIN: auto
+        run: go install github.com/errata-ai/vale/v3/cmd/vale@${{ env.VALE_VERSION }}
+
+      - name: Fetch the style packages
+        # Downloaded rather than committed, so CI needs this before it can lint.
+        run: vale sync
+
+      - name: Vale
+        run: |
+          # Vale exits non-zero whenever it has anything to say, warnings
+          # included, and the step runs under bash -e. Without this it dies
+          # before the grep that decides whether any of it was worth failing on.
+          set +e
+          vale --output=line . | tee vale.txt
+          # Errors are the tier worth failing on — a misspelt product name or a
+          # term this repository has already decided how to spell. Warnings are
+          # advice and are reported below.
+          if grep -q ':error:' vale.txt; then
+            echo "::error::Vale reported errors"
+            exit 1
+          fi
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo '### Vale'
+            echo
+            if [ -s vale.txt ]; then
+              echo '```'
+              cat vale.txt
+              echo '```'
+            else
+              echo 'Nothing to report.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

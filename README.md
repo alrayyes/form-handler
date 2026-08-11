@@ -1,6 +1,6 @@
 # form-handler
 
-[![ci](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml)
+[![CI](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/alrayyes/form-handler?sort=semver)](https://github.com/alrayyes/form-handler/releases/latest)
 [![image](https://img.shields.io/badge/ghcr.io-form--handler-2496ED?logo=docker&logoColor=white)](https://github.com/alrayyes/form-handler/pkgs/container/form-handler)
 [![scorecard](https://api.securityscorecards.dev/projects/github.com/alrayyes/form-handler/badge)](https://scorecard.dev/viewer/?uri=github.com/alrayyes/form-handler)
@@ -39,7 +39,7 @@ To work on it, additionally:
 - **[lefthook](https://lefthook.dev)** for the git hooks, and
   **[bun](https://bun.sh)** to install the linters that are not Go — commitlint,
   Prettier and markdownlint. There is a `package.json`, but nothing here is
-  JavaScript; it exists only so those resolve.
+  JavaScript; it exists only so those tools resolve.
 - **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
   hook runs from your `PATH` while CI runs it pinned. Install that version
   rather than whichever is current: when the two disagree, the hook passes and
@@ -157,7 +157,7 @@ digits, `-` and `_`.
 `origins` is per form on purpose. A site being allowed to use its own form must
 not let it use somebody else's, and the integration test asserts exactly that.
 Each entry is `scheme://host[:port]` and nothing after it, which is all a
-browser ever sends in an `Origin` header — `www.example.com` and `example.com`
+browser ever sends in the `Origin` header — `www.example.com` and `example.com`
 are different origins, so list both if you serve both.
 
 `subject` is a Go [text/template](https://pkg.go.dev/text/template) over
@@ -388,7 +388,7 @@ flooding the form, is worth noticing. A visitor mistyping their address is
 `INFO`.
 
 **This is how you tell whether a missing submission was refused here or never
-arrived.** A form that stops working has two very different causes with
+arrived.** A form that stops working has two quite different causes with
 identical symptoms: something in front of this service — Cloudflare, a proxy —
 turning the request away, or this service refusing it on the origin check. Post
 a test submission and look:

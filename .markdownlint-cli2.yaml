@@ -16,6 +16,10 @@ ignores:
   # can only cache paths inside the project directory.
   - "**/node_modules/**"
   - "**/.bun-cache/**"
+  # Vale's style packages, downloaded by `vale sync`. Somebody else's docs,
+  # held to somebody else's rules.
+  - "styles/Google/**"
+  - "styles/proselint/**"
 
 config:
   # A pull request template has no title of its own — GitHub drops it into a
