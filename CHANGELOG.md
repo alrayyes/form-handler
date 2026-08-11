@@ -11,6 +11,15 @@ alone.
 
 <!-- releases below -->
 
+## v2.0.0
+
+### Fixes
+* bc59d9713e9121edec5cbb1f7e592c100352602b fix!: believe X-Forwarded-For only from proxies you have named
+### Everything else
+* c7d4d53ee88a0baee40407a6f8d9535d126fd758 Merge pull request #10 from alrayyes/fix/trusted-proxies
+* 4dc1fee3fe111f62e65f89db1ef317d5f32fc1d0 Merge pull request #12 from alrayyes/ci/watch-image-pins
+* 8dd9d48528157ce76374a0ff8b977c749813877d ci: watch the image digests nothing was watching
+
 ## v1.3.2
 
 ### Fixes
