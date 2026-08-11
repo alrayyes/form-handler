@@ -7,14 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/netip"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 
+	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/logsafe"
 )
 
@@ -28,6 +27,10 @@ type Handler struct {
 	origins map[string]bool
 	subject *template.Template
 	limiter *limiter
+	// clientIP decides who a request is from. Its zero value ignores
+	// X-Forwarded-For entirely, which is the right answer for a service
+	// reached directly.
+	clientIP clientip.Resolver
 }
 
 // subjectData is what a subject template is rendered against. Deliberately not
@@ -48,7 +51,7 @@ type subjectData struct {
 // It returns an error rather than panicking on a bad subject template, because
 // that template comes from a config file a person edits, and the useful moment
 // to hear about a typo in it is at startup.
-func NewHandler(f Form, m Mailer, log *slog.Logger) (*Handler, error) {
+func NewHandler(f Form, m Mailer, log *slog.Logger, ip clientip.Resolver) (*Handler, error) {
 	origins := make(map[string]bool, len(f.Origins))
 	for _, o := range f.Origins {
 		if o = strings.TrimSpace(o); o != "" {
@@ -66,12 +69,13 @@ func NewHandler(f Form, m Mailer, log *slog.Logger) (*Handler, error) {
 	}
 
 	return &Handler{
-		form:    f,
-		mailer:  m,
-		log:     log,
-		origins: origins,
-		subject: subject,
-		limiter: newLimiter(f.RatePerHour, time.Hour),
+		form:     f,
+		mailer:   m,
+		log:      log,
+		origins:  origins,
+		subject:  subject,
+		limiter:  newLimiter(f.RatePerHour, time.Hour),
+		clientIP: ip,
 	}, nil
 }
 
@@ -125,7 +129,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.limiter.allow(clientIP(r)) {
+	if !h.limiter.allow(h.clientIP.From(r)) {
 		h.refuse(w, r, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
 		return
 	}
@@ -149,7 +153,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
 		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
-			"reason", "honeypot", "ip", clientIP(r), "origin", logsafe.String(origin))
+			"reason", "honeypot", "ip", h.clientIP.From(r), "origin", logsafe.String(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
 	case err != nil:
@@ -205,7 +209,7 @@ func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, bod
 		"form", h.form.ID,
 		"status", status,
 		"reason", body.Error,
-		"ip", clientIP(r),
+		"ip", h.clientIP.From(r),
 		"origin", logsafe.String(r.Header.Get("Origin")),
 	}
 	// Cloudflare stamps every request it forwards. Carrying it means a line
@@ -225,30 +229,6 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
-}
-
-// clientIP prefers X-Forwarded-For's first entry, because this runs behind a
-// proxy and RemoteAddr would otherwise be the proxy for every visitor — which
-// would rate-limit the whole internet as one client.
-//
-// Whatever comes back has parsed as an address. That header is set by whoever
-// sent the request, so without this the limiter is keyed on arbitrary strings
-// and the log carries them too. Note that this makes the value well-formed, not
-// truthful: believing it at all is what issue #6 is about.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		first, _, _ := strings.Cut(xff, ",")
-		if addr, err := netip.ParseAddr(strings.TrimSpace(first)); err == nil {
-			return addr.String()
-		}
-	}
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
-	}
-	if addr, err := netip.ParseAddr(r.RemoteAddr); err == nil {
-		return addr.String()
-	}
-	return "unknown"
 }
 
 // limiter is a fixed window per client. Deliberately in memory and deliberately

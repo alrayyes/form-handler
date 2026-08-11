@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/alrayyes/form-handler/internal/logsafe"
@@ -30,6 +31,13 @@ import (
 func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 	mux := http.NewServeMux()
 
+	// One resolver for the whole service: how many proxies sit in front is a
+	// property of the deployment, not of a form.
+	resolver, err := clientip.NewResolver(cfg.TrustedProxies)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, f := range cfg.Forms {
 		sender, err := mailerFor(f)
 		if err != nil {
@@ -41,7 +49,7 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 			Origins:     f.Origins,
 			Subject:     f.Subject,
 			RatePerHour: f.RateLimitPerHour,
-		}, sender, log)
+		}, sender, log, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("form %q: %w", f.ID, err)
 		}

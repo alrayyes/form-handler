@@ -39,8 +39,13 @@ const (
 
 // Config is the whole of what the service was told to do.
 type Config struct {
-	Addr  string
-	Forms []Form
+	Addr string
+	// TrustedProxies are the hops between the internet and this service whose
+	// X-Forwarded-For contribution can be believed. Empty means none, and the
+	// header is then ignored — see internal/clientip for why that is the safe
+	// default rather than a limitation.
+	TrustedProxies []string
+	Forms          []Form
 }
 
 // SMTP is how one form's mail leaves. Per form rather than shared, because a
@@ -96,6 +101,14 @@ var formID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 // and what every version before multi-form support did.
 func Load() (Config, error) {
 	cfg := Config{Addr: env("ADDR", DefaultAddr)}
+
+	if raw := os.Getenv("TRUSTED_PROXIES"); strings.TrimSpace(raw) != "" {
+		for _, p := range strings.Split(raw, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				cfg.TrustedProxies = append(cfg.TrustedProxies, p)
+			}
+		}
+	}
 
 	if path := os.Getenv("FORMS_FILE"); path != "" {
 		forms, err := LoadForms(path)
