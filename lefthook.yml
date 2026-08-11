@@ -12,7 +12,9 @@ pre-commit:
 
     - name: golangci-lint
       glob: "*.go"
-      run: golangci-lint run ./...
+      # Same build tag CI uses, or the integration tests go unlinted here and
+      # fail there instead.
+      run: golangci-lint run --build-tags=integration ./...
 
     # Prettier decides the layout, markdownlint then judges what Prettier
     # produced. The other order has markdownlint fixing something Prettier is
