@@ -86,12 +86,18 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 	// Liveness only. It deliberately does not test SMTP: a mail server being
 	// briefly unreachable is not a reason for the orchestrator to kill and
 	// restart a process that is otherwise answering.
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc(healthPath, func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	return mux, nil
+	// Everything the service answers goes through here, including the paths no
+	// handler above claims.
+	return logRequests(mux, log), nil
 }
+
+// healthPath is named because two places care: the mux that serves it and the
+// access log that keeps it quiet.
+const healthPath = "/healthz"
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

@@ -111,7 +111,7 @@ func newRootCommand(stdout io.Writer) *cobra.Command {
 			if healthcheck {
 				return probe()
 			}
-			return run(slog.New(slog.NewJSONHandler(stdout, nil)))
+			return run(stdout)
 		},
 	}
 
@@ -154,11 +154,16 @@ func probe() error {
 	return nil
 }
 
-func run(log *slog.Logger) error {
+func run(stdout io.Writer) error {
+	// Configuration is read before the logger exists, because the logger's own
+	// level comes out of it. A failure here is reported by cli() rather than
+	// logged, which is the one thing that cannot wait for this ordering.
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
+
+	log := slog.New(slog.NewJSONHandler(stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 
 	handler, err := server.New(cfg, log)
 	if err != nil {
