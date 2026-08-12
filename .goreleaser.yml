@@ -7,7 +7,8 @@ before:
     - go mod download
 
 builds:
-  - env:
+  - main: ./cmd/form-handler
+    env:
       - CGO_ENABLED=0
     # Only what this actually runs on. The service lives in a container on a
     # Linux VPS; cross-compiling for macOS would be building something nobody

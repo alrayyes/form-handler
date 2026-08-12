@@ -13,7 +13,7 @@ defaultBaseImage: gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9
 
 builds:
   - id: form-handler
-    main: .
+    main: ./cmd/form-handler
     env:
       # Static, so the distroless base is enough. ko defaults to this; setting
       # it makes the requirement explicit rather than inherited.
