@@ -18,6 +18,17 @@ type Mailer interface {
 	Send(ctx context.Context, m Message) error
 }
 
+// RateLimiter decides whether one caller has had enough for now, and counts the
+// submission when it says yes. The key is whatever identifies a caller — this
+// package hands it the client address and does not care how it is counted.
+//
+// Declared here for the same reason Mailer is, and kept to one method so that
+// counting submissions somewhere other than this process is a new type rather
+// than an edit to this one.
+type RateLimiter interface {
+	Allow(key string) bool
+}
+
 // Message is what actually gets delivered. Separate from Submission on purpose:
 // a submission is untrusted input, a message has been through Validate.
 //
@@ -46,9 +57,6 @@ type Form struct {
 	// Subject is a text/template rendered with .Name, .Email and .Form. Empty
 	// means DefaultSubject.
 	Subject string
-	// RatePerHour is submissions allowed per client address per hour. Zero
-	// disables the limit.
-	RatePerHour int
 }
 
 // DefaultSubject is what a form that does not name a subject template gets.

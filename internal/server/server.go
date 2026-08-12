@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/config"
@@ -14,6 +15,7 @@ import (
 	"github.com/alrayyes/form-handler/internal/logsafe"
 	"github.com/alrayyes/form-handler/internal/mail/mailgun"
 	"github.com/alrayyes/form-handler/internal/mail/smtp"
+	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
 
 // New builds the handler for every configured form.
@@ -41,12 +43,16 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 			return nil, err
 		}
 
+		// Per form, not shared: two forms on one deployment have their own
+		// allowances, so a busy careers page cannot use up what the contact
+		// form was going to give its visitors.
+		limiter := ratelimit.New(f.RateLimitPerHour, time.Hour)
+
 		h, err := contact.NewHandler(contact.Form{
-			ID:          f.ID,
-			Origins:     f.Origins,
-			Subject:     f.Subject,
-			RatePerHour: f.RateLimitPerHour,
-		}, sender, log, resolver)
+			ID:      f.ID,
+			Origins: f.Origins,
+			Subject: f.Subject,
+		}, sender, limiter, log, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("form %q: %w", f.ID, err)
 		}

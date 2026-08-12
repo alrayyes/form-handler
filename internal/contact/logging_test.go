@@ -10,12 +10,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
 
 // logged is one line of the service's JSON log, decoded.
@@ -28,10 +30,9 @@ func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
 
 	var buf bytes.Buffer
 	h, err := contact.NewHandler(contact.Form{
-		ID:          "marketing",
-		Origins:     []string{origin},
-		RatePerHour: perHour,
-	}, &recorder{}, slog.New(slog.NewJSONHandler(&buf, nil)), clientip.Resolver{})
+		ID:      "marketing",
+		Origins: []string{origin},
+	}, &recorder{}, ratelimit.New(perHour, time.Hour), slog.New(slog.NewJSONHandler(&buf, nil)), clientip.Resolver{})
 	require.NoError(t, err)
 
 	return h, func() []logged {

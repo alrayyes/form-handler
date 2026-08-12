@@ -9,9 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 	"text/template"
-	"time"
 
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/logsafe"
@@ -26,7 +24,7 @@ type Handler struct {
 	log     *slog.Logger
 	origins map[string]bool
 	subject *template.Template
-	limiter *limiter
+	limiter RateLimiter
 	// clientIP decides who a request is from. Its zero value ignores
 	// X-Forwarded-For entirely, which is the right answer for a service
 	// reached directly.
@@ -51,7 +49,7 @@ type subjectData struct {
 // It returns an error rather than panicking on a bad subject template, because
 // that template comes from a config file a person edits, and the useful moment
 // to hear about a typo in it is at startup.
-func NewHandler(f Form, m Mailer, log *slog.Logger, ip clientip.Resolver) (*Handler, error) {
+func NewHandler(f Form, m Mailer, l RateLimiter, log *slog.Logger, ip clientip.Resolver) (*Handler, error) {
 	origins := make(map[string]bool, len(f.Origins))
 	for _, o := range f.Origins {
 		if o = strings.TrimSpace(o); o != "" {
@@ -74,7 +72,7 @@ func NewHandler(f Form, m Mailer, log *slog.Logger, ip clientip.Resolver) (*Hand
 		log:      log,
 		origins:  origins,
 		subject:  subject,
-		limiter:  newLimiter(f.RatePerHour, time.Hour),
+		limiter:  l,
 		clientIP: ip,
 	}, nil
 }
@@ -129,7 +127,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.limiter.allow(h.clientIP.From(r)) {
+	if !h.limiter.Allow(h.clientIP.From(r)) {
 		h.refuse(w, r, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
 		return
 	}
@@ -229,53 +227,4 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
-}
-
-// limiter is a fixed window per client. Deliberately in memory and deliberately
-// simple: this service has one instance and one job, and a shared store would be
-// more moving parts than the problem deserves. Restarting forgives everyone,
-// which is an acceptable trade for a contact form.
-type limiter struct {
-	mu     sync.Mutex
-	seen   map[string]*window
-	limit  int
-	period time.Duration
-}
-
-type window struct {
-	count int
-	reset time.Time
-}
-
-func newLimiter(limit int, period time.Duration) *limiter {
-	return &limiter{seen: make(map[string]*window), limit: limit, period: period}
-}
-
-func (l *limiter) allow(key string) bool {
-	if l.limit <= 0 {
-		return true
-	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := time.Now()
-	// Drop expired entries while we hold the lock. Without this the map grows
-	// by one key per unique address, forever.
-	for k, w := range l.seen {
-		if now.After(w.reset) {
-			delete(l.seen, k)
-		}
-	}
-
-	w, ok := l.seen[key]
-	if !ok || now.After(w.reset) {
-		l.seen[key] = &window{count: 1, reset: now.Add(l.period)}
-		return true
-	}
-	if w.count >= l.limit {
-		return false
-	}
-	w.count++
-	return true
 }
