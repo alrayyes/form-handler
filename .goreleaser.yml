@@ -60,13 +60,13 @@ changelog:
       # The release job's own commit, and the housekeeping nobody reads release
       # notes to find out about.
       - '^chore\(release\):'
-      - '^test:'
-      - '^style:'
+      - "^test:"
+      - "^style:"
       # Both spellings of a merge. "Merge branch" was excluded and "Merge pull
       # request" was not, so every release listed the merge commit that carried
       # the change directly above the change itself.
-      - '^Merge branch'
-      - '^Merge pull request'
+      - "^Merge branch"
+      - "^Merge pull request"
 
 release:
   # Notes come from the changelog section above rather than from whatever the
