@@ -485,40 +485,34 @@ rather than as an issue. See [SECURITY.md](SECURITY.md).
 
 ## Releases
 
-Nobody picks a version. When something lands on `master`, CI asks
-[svu](https://github.com/caarlos0/svu) what the commits since the last tag add up
-to — `feat:` takes the minor, `fix:` the patch, a `BREAKING CHANGE:` footer the
-major — and tags it if that differs from the current tag. A batch of only
-`docs:` and `chore:` releases nothing, which is the intent.
+Nobody picks a version.
+[release-please](https://github.com/googleapis/release-please) reads the
+Conventional Commits that land on `master` — `feat:` takes the minor, `fix:` the
+patch, a `BREAKING CHANGE:` footer the major — and keeps a pull request open
+carrying the next version and the changelog entry it would write. A batch of only
+`docs:` and `chore:` releases nothing, which is the intent, and until you merge
+that pull request nothing is released at all.
 
-The same run then hands the tag to [goreleaser](https://goreleaser.com), which
-builds the Linux binaries, writes the GitHub release with notes grouped by change
-type, and pushes those same notes into `CHANGELOG.md` on `master` in a
-`[skip ci]` commit. That commit is the one exception to nothing-but-humans
-writing to `master`; it touches the version and the changelog and nothing else.
+Merging it tags the release and publishes the notes.
+[goreleaser](https://goreleaser.com) then builds the Linux binaries and attaches
+them, and `ko` pushes the image. Neither does the other's job: release-please
+owns the version, the notes and `CHANGELOG.md`, and goreleaser is told to leave
+all three alone.
 
-It is one workflow rather than two because a tag pushed with `GITHUB_TOKEN` does
-not start a new workflow run, so the job that decides the version has to be the
-same run that publishes it.
+That happens in one workflow rather than two, because a tag pushed with
+`GITHUB_TOKEN` starts no further workflow run — GitHub refuses, to stop recursive
+runs. So the build is a second job in the same run, gated on release-please
+saying it created a release.
 
-The changelog commit is the one part that needs a credential of its own, and the
-reason is worth knowing before you change it. The ruleset on `master` requires
-seven status checks, and a direct push has none run against it, so GitHub refuses
-the built-in `GITHUB_TOKEN`. That token cannot be granted a ruleset bypass
-either: bypassing by app is an organisation feature and this repository belongs
-to a user. So the job pushes over SSH with a write-enabled **deploy key**, held
-in the `RELEASE_SSH_KEY` secret and named in the ruleset's bypass list. A deploy
-key rather than a personal access token on purpose — it is scoped to this one
-repository, it does not expire, and it cannot act as anybody.
+The current version lives in `.release-please-manifest.json`. That is the file to
+correct by hand if a release goes wrong, not the tag. To release a version
+nobody's commits add up to, put a `Release-As: 1.2.3` footer on a commit.
 
-That commit carries `[skip ci]`, which is load-bearing rather than decorative: a
-deploy key push _does_ start workflows where a `GITHUB_TOKEN` push would not, so
-without it the pipeline would run in full to lint a changelog.
-
-The first tag is the exception: until a `v*` tag exists there is nothing to count
-commits since, so the release job says so and stops rather than releasing a
-version nobody chose. `v1.0.0` was pushed by hand. Everything after it is
-automatic.
+Two things this needs from repository settings, and both are easy to lose.
+**GitHub Actions has to be allowed to create pull requests** (Settings →
+Actions → General), or release-please has nowhere to put the release. And the
+release pull request passes the same required checks as any other before anyone
+can merge it.
 
 Dependency updates come from Dependabot — Go modules, the actions, and the
 JavaScript tooling, grouped weekly — and merge themselves once every required

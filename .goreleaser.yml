@@ -38,38 +38,10 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# release-please already wrote the notes, curated from the same commits, and
+# created the release carrying them. A second shortlog generated here would put
+# them on twice, and `release.mode: replace` would throw the curated copy away —
+# so the changelog is off and `release.mode` stays at its default,
+# keep-existing. goreleaser is only hanging binaries on a release that exists.
 changelog:
-  use: git
-  sort: asc
-  # No commit hash in front of every line. goreleaser's default template puts
-  # the full 40-character SHA there, which pushes the message — the only part
-  # anybody reads a changelog for — off to the right and makes the file
-  # unreadable at a glance. The release page links each entry to its commit
-  # anyway, and `git log` is where you go when you want the hash.
-  abbrev: -1
-  groups:
-    - title: Features
-      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
-      order: 0
-    - title: Fixes
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
-      order: 1
-    - title: Everything else
-      order: 99
-  filters:
-    exclude:
-      # The release job's own commit, and the housekeeping nobody reads release
-      # notes to find out about.
-      - '^chore\(release\):'
-      - "^test:"
-      - "^style:"
-      # Both spellings of a merge. "Merge branch" was excluded and "Merge pull
-      # request" was not, so every release listed the merge commit that carried
-      # the change directly above the change itself.
-      - "^Merge branch"
-      - "^Merge pull request"
-
-release:
-  # Notes come from the changelog section above rather than from whatever the
-  # tag message happened to say.
-  mode: replace
+  disable: true

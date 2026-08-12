@@ -85,8 +85,10 @@ and fixes nothing.
 
 ## Releases
 
-Nobody picks a version, and you do not need to touch `CHANGELOG.md`. Merging to
-`master` runs [svu](https://github.com/caarlos0/svu) over the commits since the
-last tag, tags the result if it differs, and
-[goreleaser](https://goreleaser.com) publishes the release and the image. The
-changelog commit that follows is the release job's own, marked `[skip ci]`.
+Nobody picks a version, and you do not need to touch `CHANGELOG.md`. Once your
+work is on `master`,
+[release-please](https://github.com/googleapis/release-please) folds it into a
+release pull request carrying the next version and the changelog entry. Merging
+that pull request tags the release, and
+[goreleaser](https://goreleaser.com) attaches the binaries while `ko` pushes the
+image.

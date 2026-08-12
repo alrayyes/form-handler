@@ -1,16 +1,18 @@
-# Nobody picks a version. The Conventional Commits that landed decide it, and
-# merging cuts the release.
+# Nobody picks a version. release-please reads the Conventional Commits that
+# land on master and keeps a release pull request open carrying the next version
+# and the changelog entry; merging that pull request tags the release and writes
+# the notes. goreleaser then hangs the artefacts on the release already sitting
+# there, and ko pushes the image.
 #
-# One workflow rather than two, because a tag pushed with GITHUB_TOKEN does not
-# start a new workflow run — so the job that decides the version has to be the
-# same run that publishes it. It also answers a tag pushed by hand, which is how
-# the first release of all was cut.
+# One workflow rather than two, because a tag pushed with GITHUB_TOKEN starts no
+# further workflow run — GitHub refuses, to stop recursive runs. A separate
+# on-tag workflow would silently never fire, and the first symptom is a release
+# with no binaries on it.
 name: release
 
 on:
   push:
     branches: [master]
-    tags: ["v*"]
 
 permissions:
   contents: read
@@ -22,102 +24,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Works out what, if anything, is being released, and tags it.
-  version:
+  # Works out what, if anything, is being released. Most runs only refresh the
+  # release pull request; the run that matters is the one where that pull
+  # request was what just landed.
+  release-please:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write # pushes the tag
+      contents: write # tags the release and writes it
+      pull-requests: write # keeps the release pull request up to date
     outputs:
-      version: ${{ steps.decide.outputs.version }}
-      release: ${{ steps.decide.outputs.release }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: Install svu
-        # GOTOOLCHAIN=auto for this step alone. setup-go pins the toolchain to
-        # what go.mod asks for and svu needs a newer one to build; letting it
-        # fetch that toolchain keeps the tool working without raising the
-        # minimum Go this service actually requires.
-        env:
-          GOTOOLCHAIN: auto
-        run: go install github.com/caarlos0/svu/v3@v3.4.1
-      - id: decide
-        env:
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
-          # A tag was pushed by hand. Publish exactly that, and do not argue
-          # with it — this is the escape hatch for the first release and for
-          # any version somebody deliberately chose.
-          if [ "$REF_TYPE" = "tag" ]; then
-            echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"
-            echo "release=true" >> "$GITHUB_OUTPUT"
-            echo "Releasing the pushed tag $REF_NAME."
-            exit 0
-          fi
-
-          git fetch --tags --force
-
-          # The first version is a decision, not a calculation. Until a v* tag
-          # exists there is nothing to count commits since, and guessing would
-          # release a 0.1.0 nobody asked for.
-          if [ -z "$(git tag -l 'v*')" ]; then
-            echo "release=false" >> "$GITHUB_OUTPUT"
-            echo "No v* tag exists yet. Push the first one by hand; every release after it is automatic." \
-              >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          CURRENT=$(svu current)
-          NEXT=$(svu next)
-          echo "Current $CURRENT, next $NEXT."
-
-          # A branch of only docs: and chore: adds up to the version already
-          # released, and releases nothing. That is the intent, not a failure.
-          if [ "$NEXT" = "$CURRENT" ]; then
-            echo "release=false" >> "$GITHUB_OUTPUT"
-            echo "Nothing to release: the commits since $CURRENT do not change the version." \
-              >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$NEXT" -m "$NEXT"
-          git push origin "$NEXT"
-
-          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_OUTPUT"
-          echo "Tagged $NEXT." >> "$GITHUB_STEP_SUMMARY"
-
-  release:
-    needs: version
-    if: needs.version.outputs.release == 'true'
+  artefacts:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-24.04
     permissions:
-      contents: write # writes the GitHub release
+      contents: write # attaches the binaries to the release
       packages: write # pushes the image to ghcr.io
       id-token: write # signs the provenance attestation
       attestations: write
-    outputs:
-      digest: ${{ steps.ko.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The tag, not the branch: goreleaser takes the version from the ref
-          # it is standing on, and needs the history to write the notes.
-          ref: ${{ needs.version.outputs.version }}
+          # it is standing on, and needs the history to build from.
+          ref: ${{ needs.release-please.outputs.tag_name }}
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
+      # Artefacts only. The release and its notes already exist, and goreleaser
+      # is configured to leave both alone.
       - name: goreleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
@@ -137,7 +83,7 @@ jobs:
         id: ko
         env:
           KO_DOCKER_REPO: ghcr.io/${{ github.repository }}
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.release-please.outputs.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -169,63 +115,3 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*.tar.gz
-
-  # The changelog lives in the repo as well as on the release page, because the
-  # forge should not be the only readable copy.
-  changelog:
-    needs: [version, release]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: master
-          # Pushed over SSH with a deploy key rather than with GITHUB_TOKEN.
-          # The ruleset on master requires seven status checks, and a direct
-          # push has none run against it, so the built-in token is refused —
-          # and it cannot be granted a bypass, because bypassing by app is an
-          # organisation feature and this repository belongs to a user. The
-          # deploy key can hold a bypass of its own, and unlike a personal
-          # token it cannot act as anybody.
-          ssh-key: ${{ secrets.RELEASE_SSH_KEY }}
-      - name: Write the release notes into CHANGELOG.md
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.version.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          # goreleaser already grouped these by change type. Asking the release
-          # for them keeps the two copies identical by construction.
-          # goreleaser's body opens with its own "## Changelog" heading, which
-          # would sit directly under the version heading saying the same thing.
-          NOTES=$(gh release view "$VERSION" --json body -q .body | grep -v '^## Changelog$')
-
-          # Insert directly under the marker, so the newest release is the first
-          # one a reader meets and the preamble above it stays put.
-          awk -v version="$VERSION" -v notes="$NOTES" '
-            { print }
-            /releases below/ && !done {
-              printf "\n## %s\n\n%s\n", version, notes
-              done = 1
-            }
-          ' CHANGELOG.md > CHANGELOG.next
-          mv CHANGELOG.next CHANGELOG.md
-
-          if git diff --quiet CHANGELOG.md; then
-            echo "Nothing to add to the changelog."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          # [skip ci] because this commit is the release's own housekeeping.
-          # It touches the changelog and nothing else, and is no licence for a
-          # bot to commit anything more. It is load-bearing here rather than
-          # decorative: a deploy key push does start workflows, where a
-          # GITHUB_TOKEN push would not, so without it this commit would run
-          # the whole pipeline again to lint a changelog.
-          git commit -m "chore(release): $VERSION [skip ci]"
-          git push origin master
