@@ -141,6 +141,24 @@ func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
 	assert.Equal(t, 2, mailer.count())
 }
 
+// The origin check comes first, and it has to. If the limiter counted refused
+// requests, any page on the internet could spend a visitor's allowance for
+// them: post twice from an origin this form does not serve, and the person it
+// does serve gets a 429 from a form they have never used.
+//
+// The ordering is correct today. It is also invisible — it lives between the
+// CORS headers and the JSON decoder in ServeHTTP, where nobody rearranging that
+// function would think to look for it.
+func TestARefusedOriginDoesNotConsumeTheRateLimit(t *testing.T) {
+	h := newHandler(t, &recorder{}, 1)
+	refused := post(t, h, goodBody, "https://someone-else.example")
+	require.Equal(t, http.StatusForbidden, refused.Code, "the setup did not refuse the origin")
+
+	res := post(t, h, goodBody, origin)
+
+	assert.Equal(t, http.StatusAccepted, res.Code, "the refused attempt was counted against the limit")
+}
+
 func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
 	mailer := &recorder{err: errors.New("mail server is down")}
 
