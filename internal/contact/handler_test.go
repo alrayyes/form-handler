@@ -11,12 +11,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
 
 const origin = "https://www.example.com"
@@ -62,10 +64,9 @@ const goodBody = `{"name":"Ada","email":"ada@example.com","message":"A message l
 func newHandler(t *testing.T, m contact.Mailer, perHour int) *contact.Handler {
 	t.Helper()
 	h, err := contact.NewHandler(contact.Form{
-		ID:          "default",
-		Origins:     []string{origin},
-		RatePerHour: perHour,
-	}, m, slog.New(slog.DiscardHandler), clientip.Resolver{})
+		ID:      "default",
+		Origins: []string{origin},
+	}, m, ratelimit.New(perHour, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
 	return h
 }
@@ -175,11 +176,10 @@ func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
 func TestTheFormsSubjectTemplateIsRendered(t *testing.T) {
 	mailer := &recorder{}
 	h, err := contact.NewHandler(contact.Form{
-		ID:          "careers",
-		Origins:     []string{origin},
-		Subject:     "{{ .Form }}: {{ .Name }} <{{ .Email }}>",
-		RatePerHour: 100,
-	}, mailer, slog.New(slog.DiscardHandler), clientip.Resolver{})
+		ID:      "careers",
+		Origins: []string{origin},
+		Subject: "{{ .Form }}: {{ .Name }} <{{ .Email }}>",
+	}, mailer, ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
 
 	res := post(t, h, goodBody, origin)
@@ -218,7 +218,7 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 		ID:      "broken",
 		Origins: []string{origin},
 		Subject: "Contact form: {{ .Name",
-	}, &recorder{}, slog.New(slog.DiscardHandler), clientip.Resolver{})
+	}, &recorder{}, ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 
 	require.Error(t, err, "a template that cannot parse was accepted")
 }
@@ -227,8 +227,8 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 // reading is how a contact form becomes an open relay for spam.
 func TestAFormWithNoOriginsAcceptsNothing(t *testing.T) {
 	mailer := &recorder{}
-	h, err := contact.NewHandler(contact.Form{ID: "misconfigured", RatePerHour: 100},
-		mailer, slog.New(slog.DiscardHandler), clientip.Resolver{})
+	h, err := contact.NewHandler(contact.Form{ID: "misconfigured"},
+		mailer, ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
 
 	res := post(t, h, goodBody, origin)
@@ -260,8 +260,8 @@ func TestBehindATrustedProxyVisitorsAreCountedSeparately(t *testing.T) {
 	resolver, err := clientip.NewResolver([]string{"192.0.2.0/24"})
 	require.NoError(t, err)
 	h, err := contact.NewHandler(contact.Form{
-		ID: "default", Origins: []string{origin}, RatePerHour: 1,
-	}, mailer, slog.New(slog.DiscardHandler), resolver)
+		ID: "default", Origins: []string{origin},
+	}, mailer, ratelimit.New(1, time.Hour), slog.New(slog.DiscardHandler), resolver)
 	require.NoError(t, err)
 
 	first := postAs(t, h, "198.51.100.1")
