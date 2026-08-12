@@ -74,8 +74,9 @@ groundwork before the change it made room for, and push with
 
 The same commands the hooks run, so a green pre-commit means a green lint stage:
 `gofmt` and `golangci-lint` over the Go, Prettier and then markdownlint over the
-Markdown, `go test` with the race detector, the integration test against a real
-Mailpit, a CodeQL pass, and a `ko build` to prove the image still assembles.
+Markdown, Biome over the JSON, `go test` with the race detector, the integration
+test against a real Mailpit, a CodeQL pass, and a `ko build` to prove the image
+still assembles.
 
 Prettier decides Markdown layout and markdownlint judges what Prettier produced.
 If the two ever disagree, Prettier wins and the markdownlint rule comes off —

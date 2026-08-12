@@ -129,6 +129,23 @@ jobs:
       - name: markdownlint
         run: bunx markdownlint-cli2
 
+  # Biome takes every file type it supports, which in a Go repository is the
+  # JSON: the tooling manifests, the linter configs, and what release-please
+  # keeps the version in. Small, and exactly the sort of file a bad edit breaks
+  # silently until the tool that reads it next runs.
+  json:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: biome
+        # The same command the pre-push hook runs. `check` is format and lint
+        # together, reporting rather than writing.
+        run: bunx biome check .
+
   # A hook is something you can skip, and the version number depends on these
   # messages being right, so the whole branch is checked here as well.
   commits:
