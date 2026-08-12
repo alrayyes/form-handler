@@ -53,7 +53,7 @@ other tool runs from a pinned container image or through `bunx`.
 ```sh
 git clone https://github.com/alrayyes/form-handler.git
 cd form-handler
-go build .
+go build ./cmd/form-handler
 ```
 
 Or take the image CI builds, which is what actually runs in production:
@@ -82,7 +82,7 @@ lefthook install
 ## Running it
 
 ```sh
-go run .
+go run ./cmd/form-handler
 ```
 
 It listens on `:8080`. How you configure it depends on how many forms you have.
@@ -96,7 +96,7 @@ deployment wants, and what the service did before it could hold more than one:
 MAIL_FROM=site@example.com \
 MAIL_TO=info@example.com \
 ALLOWED_ORIGINS=https://www.example.com \
-  go run .
+  go run ./cmd/form-handler
 ```
 
 | Variable              | Default          | What it does                                                                       |
@@ -543,7 +543,7 @@ the same distroless base, pinned to the same digest it always was.
 To build it yourself:
 
 ```sh
-VERSION=dev KO_DOCKER_REPO=ko.local ko build --bare --local ./
+VERSION=dev KO_DOCKER_REPO=ko.local ko build --bare --local ./cmd/form-handler
 ```
 
 **The entrypoint is `/ko-app/form-handler`, not `/form-handler`.** ko puts the
