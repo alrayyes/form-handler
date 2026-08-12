@@ -20,7 +20,7 @@ pre-commit:
     # produced. The other order has markdownlint fixing something Prettier is
     # about to overwrite.
     - name: prettier
-      glob: "*.md"
+      glob: "*.{md,yml,yaml}"
       run: bunx prettier --write {staged_files}
       stage_fixed: true
 
@@ -34,6 +34,13 @@ pre-commit:
     - name: vale
       glob: "*.md"
       run: vale {staged_files}
+
+    # Biome owns every file type it supports, which here is the JSON and
+    # nothing else. It formats and lints in one pass, so this is both.
+    - name: biome
+      glob: "*.json"
+      run: bunx biome check --write {staged_files}
+      stage_fixed: true
 
 commit-msg:
   jobs:
@@ -51,10 +58,13 @@ pre-push:
       run: go test ./...
 
     - name: prettier
-      run: bunx prettier --check "**/*.md"
+      run: bunx prettier --check "**/*.{md,yml,yaml}"
 
     - name: markdownlint
       run: bunx markdownlint-cli2
+
+    - name: biome
+      run: bunx biome check .
 
     # The integration test is not here on purpose: it wants a Docker daemon and
     # takes the better part of a minute, which is more than a push should cost.

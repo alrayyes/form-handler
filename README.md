@@ -38,8 +38,8 @@ To work on it, additionally:
   container. Not needed to build the image: `ko` does that without a daemon.
 - **[lefthook](https://lefthook.dev)** for the git hooks, and
   **[bun](https://bun.sh)** to install the linters that are not Go — commitlint,
-  Prettier and markdownlint. There is a `package.json`, but nothing here is
-  JavaScript; it exists only so those tools resolve.
+  Prettier, markdownlint and Biome. There is a `package.json`, but nothing here
+  is JavaScript; it exists only so those tools resolve.
 - **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
   hook runs from your `PATH` while CI runs it pinned. Install that version
   rather than whichever is current: when the two disagree, the hook passes and

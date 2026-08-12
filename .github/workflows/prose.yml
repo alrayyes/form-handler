@@ -12,9 +12,19 @@ name: prose
 on:
   push:
     branches: [master]
-    paths: ["**/*.md", ".vale.ini", ".ltex.json", "styles/**", ".github/workflows/prose.yml"]
+    paths:
+      - "**/*.md"
+      - .vale.ini
+      - .ltex.json
+      - styles/**
+      - .github/workflows/prose.yml
   pull_request:
-    paths: ["**/*.md", ".vale.ini", ".ltex.json", "styles/**", ".github/workflows/prose.yml"]
+    paths:
+      - "**/*.md"
+      - .vale.ini
+      - .ltex.json
+      - styles/**
+      - .github/workflows/prose.yml
   workflow_dispatch:
 
 permissions:
