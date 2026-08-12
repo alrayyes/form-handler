@@ -5,9 +5,20 @@ name: codeql
 
 on:
   push:
+    # master only. This is the run that keeps the baseline the pull request
+    # analyses are compared against.
     branches: [master]
+  # Every pull request, whatever it is based on. GitHub's starter workflow
+  # filters this to the default branch, which is right until two pull requests
+  # are stacked: the child is based on its parent, codeql never fires, and
+  # because codeql is a required check the child then waits forever for a run
+  # that is not coming. Retargeting it when the parent merges does not help —
+  # that arrives as an `edited` event, which is not one of the three types a
+  # pull_request trigger listens for by default.
+  #
+  # The cost of dropping the filter is one analysis per stacked pull request,
+  # about two minutes. The cost of keeping it was a merge nobody could make.
   pull_request:
-    branches: [master]
   schedule:
     # Weekly, because the queries improve even when the code does not.
     - cron: "27 4 * * 1"
