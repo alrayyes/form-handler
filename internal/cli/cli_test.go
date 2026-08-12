@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package main
+package cli_test
 
 import (
 	"bytes"
@@ -13,19 +13,27 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alrayyes/form-handler/internal/cli"
 )
+
+// version is what the build stamps into the binary. Handed in by the test
+// rather than read off a package variable, so asserting on it says something:
+// the old test compared the output against the same variable the code printed,
+// which passed whatever either of them said.
+const version = "v9.9.9-test"
 
 // run drives the command exactly as main() does, and hands back what a user
 // would have seen.
-func runCLI(t *testing.T, args ...string) (code int, stdout, stderr string) {
+func run(t *testing.T, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	code = cli(args, &out, &errOut)
+	code = cli.Run(version, args, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
 func TestVersionIsPrintedBare(t *testing.T) {
-	code, stdout, _ := runCLI(t, "--version")
+	code, stdout, _ := run(t, "--version")
 
 	require.Zero(t, code)
 	// Bare, not cobra's "form-handler version X" sentence: this is documented
@@ -37,7 +45,7 @@ func TestVersionIsPrintedBare(t *testing.T) {
 // The flags were parsed by the standard library before cobra, and `flag` treats
 // one dash and two alike. Anything already deployed asks for them this way.
 func TestLegacySingleDashFlagsStillWork(t *testing.T) {
-	code, stdout, _ := runCLI(t, "-version")
+	code, stdout, _ := run(t, "-version")
 
 	require.Zero(t, code)
 	assert.Equal(t, version+"\n", stdout)
@@ -49,7 +57,7 @@ func TestLegacySingleDashFlagsStillWork(t *testing.T) {
 // probing itself this way since before cobra goes unhealthy on upgrade while
 // the service behind it is answering perfectly well.
 func TestBothSpellingsOfHealthcheckProbeAServingProcess(t *testing.T) {
-	// probe() talks to the loopback on the port from ADDR, so the test has to
+	// The probe talks to the loopback on the port from ADDR, so the test has to
 	// put a real server on a real port rather than fake the call.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -60,7 +68,7 @@ func TestBothSpellingsOfHealthcheckProbeAServingProcess(t *testing.T) {
 		t.Run(flag, func(t *testing.T) {
 			t.Setenv("ADDR", ":"+portOf(t, srv.URL))
 
-			code, _, stderr := runCLI(t, flag)
+			code, _, stderr := run(t, flag)
 
 			assert.Zero(t, code, "stderr: %s", stderr)
 		})
@@ -70,14 +78,14 @@ func TestBothSpellingsOfHealthcheckProbeAServingProcess(t *testing.T) {
 func TestHealthcheckFailsWhenNothingIsServing(t *testing.T) {
 	t.Setenv("ADDR", unreachableAddr(t))
 
-	code, _, stderr := runCLI(t, "--healthcheck")
+	code, _, stderr := run(t, "--healthcheck")
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, stderr, "error:")
 }
 
 func TestUnknownFlagIsRefused(t *testing.T) {
-	code, _, stderr := runCLI(t, "--nonsense")
+	code, _, stderr := run(t, "--nonsense")
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, stderr, "error:")
@@ -86,7 +94,7 @@ func TestUnknownFlagIsRefused(t *testing.T) {
 // Only the two documented flags are rewritten. Anything else keeps pflag's
 // meaning, rather than being promoted into a long flag nobody defined.
 func TestAnUnknownSingleDashFlagIsStillAnError(t *testing.T) {
-	code, _, stderr := runCLI(t, "-nonsense")
+	code, _, stderr := run(t, "-nonsense")
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, stderr, "error:")
@@ -94,14 +102,14 @@ func TestAnUnknownSingleDashFlagIsStillAnError(t *testing.T) {
 
 // It takes no arguments at all — everything else comes from the environment.
 func TestStrayArgumentsAreRefused(t *testing.T) {
-	code, _, stderr := runCLI(t, "serve")
+	code, _, stderr := run(t, "serve")
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, stderr, "error:")
 }
 
 func TestHelpIsNotAnError(t *testing.T) {
-	code, stdout, _ := runCLI(t, "--help")
+	code, stdout, _ := run(t, "--help")
 
 	require.Zero(t, code)
 	assert.Contains(t, stdout, "form-handler")
