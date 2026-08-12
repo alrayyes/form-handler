@@ -11,6 +11,11 @@ alone.
 
 <!-- releases below -->
 
+## v2.1.3
+
+### Fixes
+*  fix(ci): let Vale's errors fail the style job
+
 ## v2.1.2
 
 ### Fixes
