@@ -20,7 +20,7 @@ pre-commit:
     # produced. The other order has markdownlint fixing something Prettier is
     # about to overwrite.
     - name: prettier
-      glob: "*.md"
+      glob: "*.{md,yml,yaml}"
       run: bunx prettier --write {staged_files}
       stage_fixed: true
 
@@ -58,7 +58,7 @@ pre-push:
       run: go test ./...
 
     - name: prettier
-      run: bunx prettier --check "**/*.md"
+      run: bunx prettier --check "**/*.{md,yml,yaml}"
 
     - name: markdownlint
       run: bunx markdownlint-cli2

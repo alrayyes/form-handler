@@ -125,7 +125,9 @@ jobs:
         # resolving to something nobody committed.
         run: bun install --frozen-lockfile
       - name: prettier --check
-        run: bunx prettier --check "**/*.md"
+        # YAML as well as Markdown. Every workflow, every config: it is the
+        # other format Biome does not take, and this job is where it lands.
+        run: bunx prettier --check "**/*.{md,yml,yaml}"
       - name: markdownlint
         run: bunx markdownlint-cli2
 
