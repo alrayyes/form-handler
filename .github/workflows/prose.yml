@@ -115,42 +115,13 @@ jobs:
           GOTOOLCHAIN: auto
         run: go install github.com/errata-ai/vale/v3/cmd/vale@${{ env.VALE_VERSION }}
 
-      - name: Fetch the style packages
-        # Downloaded rather than committed, so CI needs this before it can lint.
-        run: vale sync
-
       - name: Vale
-        run: |
-          # Vale exits non-zero whenever it has anything to say, warnings
-          # included, and the step runs under bash -e. Without this it dies
-          # before the check that decides whether any of it was worth failing on.
-          set +e
-
-          # The same list the mechanics job checks: the prose this repository
-          # owns. A bare `vale .` also reads the Contributor Covenant, the
-          # generated changelog and the README of every downloaded style
-          # package, and holds all of them to house rules they were never
-          # written to.
-          files=$(git ls-files '*.md' | grep -v '^CODE_OF_CONDUCT.md$' | grep -v '^CHANGELOG.md$')
-          echo "Checking:"; echo "$files"
-
-          # shellcheck disable=SC2086
-          vale --output=line $files | tee vale.txt
-
-          # Errors are the tier worth failing on — a misspelt product name or a
-          # term this repository has already decided how to spell. Warnings are
-          # advice and are reported below.
-          #
-          # Decided by a second run rather than by reading vale.txt: the line
-          # format prints file, position, rule and message and no severity at
-          # all, so grepping it for ":error:" matched nothing and this job could
-          # not fail however wrong the prose was.
-          # shellcheck disable=SC2086
-          vale --minAlertLevel=error --output=line $files > /dev/null
-          if [ $? -ne 0 ]; then
-            echo "::error::Vale reported errors"
-            exit 1
-          fi
+        # The same script the pre-push hook runs, so the two cannot check
+        # different files or disagree about what is worth failing on. They did
+        # once: the hook had no exclusion list and no whole-tree run at all.
+        env:
+          VALE_REPORT: vale.txt
+        run: ./scripts/lint-prose.sh
 
       - name: Report
         if: always()
