@@ -240,9 +240,34 @@ That happens in one workflow rather than two, because a tag pushed with
 recursive runs. So the build is a second job in the same run, gated on
 release-please saying it created a release.
 
+**Merge with an empty commit body, or every entry lands twice.**
+
+```sh
+gh pr merge <n> --merge --body ""
+```
+
+GitHub puts the pull request title into the body of a merge commit, and this
+repository's titles are Conventional Commits. release-please then reads the
+merge commit and the branch commit as two separate changes and writes both, so
+the changelog and the release notes carry each line twice.
+
+The repository setting cannot fix it. GitHub allows only three title-and-body
+combinations, and all three put the pull request title somewhere in the merge
+commit, so `MERGE_MESSAGE` with a blank body is not offered. Merging from the
+web interface means clearing the body by hand before confirming the merge.
+Merging with `--body ""` is the reliable way.
+
+Squash merging would also solve it, and is what release-please expects. It is
+not what this repository does: a pull request here holds several commits that
+each build and pass on their own, and squashing throws that away.
+
 The current version lives in `.release-please-manifest.json`. That is the file
 to correct by hand if a release goes wrong, not the tag. To release a version
 nobody's commits add up to, put a `Release-As: 1.2.3` footer on a commit.
+
+If duplicates do reach a release pull request, edit `CHANGELOG.md` on that
+branch before merging it. release-please only appends, so a correction there
+survives.
 
 Two things this needs from repository settings, and both are easy to lose.
 **GitHub Actions has to be allowed to create pull requests** (Settings →

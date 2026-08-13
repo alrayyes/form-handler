@@ -33,6 +33,18 @@ pre-commit:
     # over LSP, not here.
     - name: vale
       glob: "*.md"
+      # The same two the CI job leaves out, and for the same reason: the
+      # Contributor Covenant is somebody else's document and the changelog is
+      # written by the release job. Both are prose nobody here composed, and
+      # holding them to house style fails a commit over a `ci:` scope in a
+      # generated line.
+      #
+      # Vale is the one linter whose exclusions cannot live in its own config,
+      # so unlike Prettier and markdownlint it has to be told twice. When it
+      # was only told once, correcting the changelog by hand was impossible.
+      exclude:
+        - "CODE_OF_CONDUCT.md"
+        - "CHANGELOG.md"
       run: vale {staged_files}
 
     # Biome owns every file type it supports, which here is the JSON and
@@ -47,7 +59,17 @@ pre-commit:
     # naming a path here is how the hook and CI end up checking different
     # files. The glob only decides whether it is worth running at all.
     - name: redocly
-      glob: "{api/*.yaml,redocly.yaml}"
+      # Wider than the one file this repository has today. `api/*.yaml` missed
+      # a spec named .yml and missed one split across api/paths/, and a hook
+      # that silently does not run is worse than no hook — the failure surfaces
+      # at CI instead, after the push, which is the gap the hooks exist to
+      # close.
+      glob:
+        - "api/*.yaml"
+        - "api/*.yml"
+        - "api/**/*.yaml"
+        - "api/**/*.yml"
+        - "redocly.yaml"
       run: bunx redocly lint
 
 commit-msg:
