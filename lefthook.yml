@@ -59,7 +59,17 @@ pre-commit:
     # naming a path here is how the hook and CI end up checking different
     # files. The glob only decides whether it is worth running at all.
     - name: redocly
-      glob: "{api/*.yaml,redocly.yaml}"
+      # Wider than the one file this repository has today. `api/*.yaml` missed
+      # a spec named .yml and missed one split across api/paths/, and a hook
+      # that silently does not run is worse than no hook — the failure surfaces
+      # at CI instead, after the push, which is the gap the hooks exist to
+      # close.
+      glob:
+        - "api/*.yaml"
+        - "api/*.yml"
+        - "api/**/*.yaml"
+        - "api/**/*.yml"
+        - "redocly.yaml"
       run: bunx redocly lint
 
 commit-msg:
