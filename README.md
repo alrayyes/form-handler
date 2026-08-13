@@ -37,7 +37,8 @@ To work on it, additionally:
 - **Docker**, for the integration test — it starts a real mail server in a
   container. Not needed to build the image: `ko` does that without a daemon.
 - **[bun](https://bun.sh)** to install the tooling that is not Go — commitlint,
-  Prettier, markdownlint, Biome and the [lefthook](https://lefthook.dev) that
+  Prettier, markdownlint, Biome, the [Redocly](https://redocly.com/docs/cli)
+  that lints the API description, and the [lefthook](https://lefthook.dev) that
   runs the git hooks. There is a `package.json`, but nothing here is JavaScript;
   it exists only so those tools resolve and stay pinned.
 - **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
@@ -291,19 +292,31 @@ the form called `default`.
 `website` is the honeypot: it is hidden from people, so anything that fills it in
 is automated. Unknown fields are rejected outright.
 
-| Status | Meaning                                                         |
-| ------ | --------------------------------------------------------------- |
-| `202`  | Accepted. Also what a honeypot submission gets — see below.     |
-| `400`  | The body could not be read, or contained fields we do not know. |
-| `403`  | The `Origin` is not one of this form's.                         |
-| `404`  | No form by that name.                                           |
-| `422`  | A field is wrong. The body names which one and why.             |
-| `429`  | Too many submissions from this address this hour.               |
-| `502`  | The mail server would not take it.                              |
+| Status | Meaning                                                          |
+| ------ | ---------------------------------------------------------------- |
+| `202`  | Accepted. Also what a honeypot submission gets — see below.      |
+| `204`  | A preflight was answered. `OPTIONS` only, and the body is empty. |
+| `400`  | The body could not be read, or contained fields we do not know.  |
+| `403`  | The `Origin` is not one of this form's.                          |
+| `404`  | No form by that name.                                            |
+| `405`  | Anything other than `POST` or `OPTIONS`.                         |
+| `422`  | A field is wrong. The body names which one and why.              |
+| `429`  | Too many submissions from this address this hour.                |
+| `500`  | The form's subject template would not render.                    |
+| `502`  | The mail server would not take it.                               |
 
 `GET /healthz` answers `{"status":"ok"}` and deliberately does not test SMTP: a
 mail server being briefly unreachable is not a reason for an orchestrator to
 restart a process that is answering perfectly well.
+
+The whole contract is written down in [`api/openapi.yaml`](api/openapi.yaml):
+every status in that table, what the request body accepts, and the headers a
+preflight gets back. It is worth trusting because nothing about it is
+hand-maintained on the honour system — `internal/server/openapi_test.go`
+provokes every documented response out of the real handler and fails if one has
+moved, or if the spec describes one the service never returns. That table spent
+its whole life missing three codes, which is the argument for having a
+description a test can read.
 
 ## Behind a proxy
 

@@ -150,6 +150,25 @@ jobs:
         # `check` is format and lint together, reporting rather than writing.
         run: bun run lint:json
 
+  # The API description is a contract, and this is the half of checking it that
+  # the Go tests cannot do. `go test` proves the spec matches what the handler
+  # answers; this proves the document is valid OpenAPI while it does, so a spec
+  # that drifts into something no generator or client can read fails here
+  # rather than in whatever consumes it next.
+  api:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: redocly lint
+        # The same script the pre-push hook runs. The extra flag only moves the
+        # findings from a codeframe nobody scrolls to into annotations on the
+        # diff; what gets linted is the `apis` list in redocly.yaml either way.
+        run: bun run lint:api -- --format=github-actions
+
   # A hook is something you can skip, and the version number depends on these
   # messages being right, so the whole branch is checked here as well.
   commits:

@@ -42,6 +42,14 @@ pre-commit:
       run: bunx biome check --write {staged_files}
       stage_fixed: true
 
+    # Reads only, so it changes nothing to restage. Invoked bare rather than on
+    # {staged_files}: what gets linted is the `apis` list in redocly.yaml, and
+    # naming a path here is how the hook and CI end up checking different
+    # files. The glob only decides whether it is worth running at all.
+    - name: redocly
+      glob: "{api/*.yaml,redocly.yaml}"
+      run: bunx redocly lint
+
 commit-msg:
   jobs:
     # Resolved from node_modules rather than fetched by bunx: commitlint has to
@@ -57,9 +65,9 @@ pre-push:
     - name: test
       run: go test ./...
 
-    # These three are `package.json` scripts rather than the commands spelled
-    # out, because CI runs the same three and a literal copied into two files
-    # drifts the first time somebody edits one of them.
+    # These are `package.json` scripts rather than the commands spelled out,
+    # because CI runs the same ones and a literal copied into two files drifts
+    # the first time somebody edits one of them.
     - name: prettier
       run: bun run format:check
 
@@ -68,6 +76,9 @@ pre-push:
 
     - name: biome
       run: bun run lint:json
+
+    - name: redocly
+      run: bun run lint:api
 
     # The integration test is not here on purpose: it wants a Docker daemon and
     # takes the better part of a minute, which is more than a push should cost.

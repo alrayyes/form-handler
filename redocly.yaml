@@ -1,0 +1,32 @@
+# The API description is linted like everything else here. `redocly lint` is
+# invoked bare rather than pointed at a file, so the hook and CI cannot end up
+# checking different things — what gets linted is whatever is listed below.
+apis:
+  form-handler:
+    root: api/openapi.yaml
+
+# Strict because the spec is new. `recommended` on its own promotes nothing to
+# an error, and `lint` exits 0 when every finding is a warning — so a job left
+# on it passes with a screen full of them, and the ruleset is the gate rather
+# than any flag. `minimal` is for adopting this into an API that already
+# shipped without it.
+extends:
+  - recommended-strict
+
+# Two rules come off, both because they assume every operation is shaped like a
+# CRUD resource. Neither is disabled to get to green over a finding that is
+# really there — the spec documents every response this service returns, and
+# internal/server/openapi_test.go provokes each one out of the real handler.
+rules:
+  # OpenAPI has no way to say "every method other than these two", so the 405
+  # is documented as a GET, and an operation whose whole purpose is to refuse
+  # has no 2xx to pair with it.
+  operation-2xx-response: off
+
+  # /healthz ignores the request and answers 200 to anything. There is no 4xx
+  # to document, and inventing one to satisfy the rule would be the first lie
+  # in the file.
+  operation-4xx-response: off
+
+# It is a linter. It has no business reporting what we lint.
+telemetry: off

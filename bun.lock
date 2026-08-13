@@ -8,6 +8,7 @@
         "@biomejs/biome": "2.5.8",
         "@commitlint/cli": "21.2.1",
         "@commitlint/config-conventional": "21.2.0",
+        "@redocly/cli": "2.46.1",
         "lefthook": "2.1.10",
         "markdownlint-cli2": "0.23.2",
         "prettier": "3.9.6",
@@ -83,6 +84,8 @@
     "@nodelib/fs.stat": ["@nodelib/fs.stat@2.0.5", "", {}, "sha512-RkhPPp2zrqDAQA/2jNhnztcPAlv64XdhIp7a7454A5ovI7Bukxgt7MX7udwAu3zg1DcpPU0rz3VV1SeaqvY4+A=="],
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
+
+    "@redocly/cli": ["@redocly/cli@2.46.1", "", { "bin": { "openapi": "bin/cli.js", "redocly": "bin/cli.js" } }, "sha512-FSUSq2FU8VN7DmTobTmq7zb3zPnDkRKSMd3n38D62JFJUUZKnLMQtn7BUhsD2dCFH2WgF05I3fbN7QHDQyCBeA=="],
 
     "@simple-libs/child-process-utils": ["@simple-libs/child-process-utils@2.0.0", "", { "dependencies": { "@simple-libs/stream-utils": "^2.0.0" } }, "sha512-dvNoRKLijXnD0XoJAz94pbNuB5GQgDr55UhpSPhffDkTT0Cmcqh9jSCOtwfT2d4H6MI9E7c4SgtMuJXZ6F3c6A=="],
 
