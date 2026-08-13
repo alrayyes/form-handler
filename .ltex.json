@@ -9,6 +9,7 @@
       "GHCR",
       "Mailgun",
       "Mailpit",
+      "OpenAPI",
       "Redocly",
       "Renovate",
       "Scorecard",
@@ -28,6 +29,7 @@
       "honeypot",
       "ko",
       "lefthook",
+      "ltex-cli-plus",
       "markdownlint",
       "nginx",
       "pflag",
@@ -38,6 +40,7 @@
       "rulesets",
       "svu",
       "testcontainers",
+      "unexported",
       "unmergeable",
       "unshare"
     ]

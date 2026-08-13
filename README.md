@@ -21,8 +21,6 @@ without sharing an inbox, and neither can post to the other.
 
 ## Requirements
 
-To run it:
-
 - **Go 1.25 or newer**, or Docker if you would rather run the image.
 - **An SMTP server** it may send through. In production that is a mail bridge on
   the same host; locally it is a throwaway container, below.
@@ -31,23 +29,6 @@ To run it:
 - **The origins that may post to it.** Also no default — there is no origin
   that is right for everybody, and the consequence of guessing is somebody
   else's page using your mailbox.
-
-To work on it, additionally:
-
-- **Docker**, for the integration test — it starts a real mail server in a
-  container. Not needed to build the image: `ko` does that without a daemon.
-- **[bun](https://bun.sh)** to install the tooling that is not Go — commitlint,
-  Prettier, markdownlint, Biome, the [Redocly](https://redocly.com/docs/cli)
-  that lints the API description, and the [lefthook](https://lefthook.dev) that
-  runs the git hooks. There is a `package.json`, but nothing here is JavaScript;
-  it exists only so those tools resolve and stay pinned.
-- **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
-  hook runs from your `PATH` while CI runs it pinned. Install that version
-  rather than whichever is current: when the two disagree, the hook passes and
-  the pipeline fails, and the reason is not obvious from the failure.
-
-Nothing else needs installing. The Go dependencies come from `go.mod`, and every
-other tool runs from a pinned container image or through `bunx`.
 
 ## Installation
 
@@ -70,14 +51,6 @@ check what built it and from which commit:
 
 ```sh
 gh attestation verify oci://ghcr.io/alrayyes/form-handler:latest --repo alrayyes/form-handler
-```
-
-Working on it? One command installs the linters and the git hooks — an
-uninstalled hook silently does nothing, which is worse than not having one, so
-`prepare` puts them in for you:
-
-```sh
-bun install
 ```
 
 ## Running it
@@ -419,131 +392,6 @@ line here can be matched against the same request in Cloudflare's own logs.
 Headers are truncated before they reach a log line — `origin` and `cf_ray` are
 whatever the sender chose to put in them.
 
-## Decisions worth knowing
-
-**A caught bot gets `202`, exactly like a real submission.** Same status, same
-body. Telling it that the honeypot fired only teaches whoever wrote it which
-field to leave alone next time. There is a test asserting the two responses are
-byte-identical, because this is easy to break by adding a helpful error message.
-
-**The visitor's address goes in `Reply-To`, never in `From`.** Sending as them
-would fail SPF for their domain and land the whole thing in spam. The mail is
-_from_ this service, _about_ them, and hitting reply still reaches them.
-
-**Headers are stripped of line breaks before use.** A name containing `\r\n` is
-someone trying to add their own headers — `Bcc:`, most likely — and a contact
-form is a fine place to try it from.
-
-**Origin is checked, not just answered.** Refusing the CORS header stops a
-browser reading the response, but the request still arrived and would still have
-sent mail. The check that matters is server-side.
-
-**A form with no origins refuses everything.** Fail closed: an empty list is a
-misconfiguration, and the safe reading of "nobody is allowed" is not "everybody
-is". This is why `ALLOWED_ORIGINS` has no default.
-
-**Each form gets its own mailer, not a shared one with a switch.** Choosing the
-recipient per request would work right up until two forms were configured
-alike, and then it would deliver somebody's job application to the marketing
-inbox.
-
-**The rate limiter is in memory and forgets on restart.** One instance, one job,
-and per form. A shared store would be more moving parts than a contact form
-justifies, and the worst case is that a restart forgives someone.
-
-## Testing
-
-Two layers, and the outer one is the one to trust:
-
-```sh
-go test ./...                    # unit: validation, honeypot, limits, routing
-go test -tags=integration ./...  # runs a real mail server in a container
-```
-
-The integration test starts Mailpit with testcontainers, posts real requests at
-the real composition root, and asserts real messages arrived in the right
-inboxes with the right `Reply-To`, subject and body. It needs a working Docker.
-
-Underneath it, every mail adapter is held to one shared contract in
-[`internal/contact/mailertest`](internal/contact/mailertest). The `Mailer`
-interface says a send returns an error; the contract says what that error is —
-a typed `DeliveryError` naming the provider and the step it got to, with the
-cause still reachable underneath. It runs against the SMTP adapter, the Mailgun
-adapter, and the fake the handler tests use. Holding the fake to it is the
-point: a fake that fails differently from the real thing makes tests pass for a
-reason production does not reproduce.
-
-The SMTP adapter is driven over a real socket against a stub that speaks the
-protocol, so header encoding, the stripped line break and the lone dot in a body
-are covered without Docker. What still needs Mailpit is the last claim, and it
-is the one worth keeping: that a real mail server accepts what we compose.
-
-If you already have a Mailpit running, point the test at it and it will use that
-instead of starting one of its own:
-
-```sh
-MAILPIT_SMTP_ADDR=127.0.0.1:1025 MAILPIT_API_URL=http://127.0.0.1:8025 \
-  go test -tags=integration ./...
-```
-
-That is how CI runs it, and the reason is worth knowing before you change it.
-Testcontainers needs a Docker daemon _inside_ the job, and the only two ways to
-give a job one are a privileged sidecar or a mount of the host's socket. Neither
-is a trade worth making for a contact form, so the workflow runs Mailpit as an
-ordinary service container and sets those two variables. The assertions are the
-same either way. One difference to keep in mind: a shared server keeps its
-messages between tests, so the test empties the mailbox first.
-
-The integration test is behind a build tag so `go test ./...` stays fast. CI runs
-both.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: write the outer test
-first, branch, push, open a pull request, and let someone else merge it. Commit
-messages follow [Conventional Commits](https://www.conventionalcommits.org) —
-they are what pick the next version number.
-
-Found a security problem? [Report it
-privately](https://github.com/alrayyes/form-handler/security/advisories/new)
-rather than as an issue. See [SECURITY.md](SECURITY.md).
-
-## Releases
-
-Nobody picks a version.
-[release-please](https://github.com/googleapis/release-please) reads the
-Conventional Commits that land on `master` — `feat:` takes the minor, `fix:` the
-patch, a `BREAKING CHANGE:` footer the major — and keeps a pull request open
-carrying the next version and the changelog entry it would write. A batch of only
-`docs:` and `chore:` releases nothing, which is the intent, and until you merge
-that pull request nothing is released at all.
-
-Merging it tags the release and publishes the notes.
-[goreleaser](https://goreleaser.com) then builds the Linux binaries and attaches
-them, and `ko` pushes the image. Neither does the other's job: release-please
-owns the version, the notes and `CHANGELOG.md`, and goreleaser is told to leave
-all three alone.
-
-That happens in one workflow rather than two, because a tag pushed with
-`GITHUB_TOKEN` starts no further workflow run — GitHub refuses, to stop recursive
-runs. So the build is a second job in the same run, gated on release-please
-saying it created a release.
-
-The current version lives in `.release-please-manifest.json`. That is the file to
-correct by hand if a release goes wrong, not the tag. To release a version
-nobody's commits add up to, put a `Release-As: 1.2.3` footer on a commit.
-
-Two things this needs from repository settings, and both are easy to lose.
-**GitHub Actions has to be allowed to create pull requests** (Settings →
-Actions → General), or release-please has nowhere to put the release. And the
-release pull request passes the same required checks as any other before anyone
-can merge it.
-
-Dependency updates come from Dependabot — Go modules, the actions, and the
-JavaScript tooling, grouped weekly — and merge themselves once every required
-check is green. Two pins it cannot see are updated by hand: the distroless base
-in `.ko.yaml` and the Mailpit image the integration test uses.
-
 ## Deploying
 
 CI builds and pushes an image to
@@ -574,6 +422,19 @@ Pin the **digest** in your compose file, not the tag. A tag can be moved; a
 digest cannot, which is the difference between knowing what is running and
 assuming it. `form-handler --version` inside the container tells you which release
 a digest is, so pinning a digest no longer means losing the version.
+
+## Contributing
+
+Everything about working on this — how it is put together, how to run the
+tests, the decisions worth knowing before you change one, and how a release is
+cut — is in [CONTRIBUTING.md](CONTRIBUTING.md). Short version: write the outer
+test first, branch, push, open a pull request, and let someone else merge it.
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org),
+and they are what pick the next version number.
+
+Found a security problem? [Report it
+privately](https://github.com/alrayyes/form-handler/security/advisories/new)
+rather than as an issue. See [SECURITY.md](SECURITY.md).
 
 ## Licence
 
