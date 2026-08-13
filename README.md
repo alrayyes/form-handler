@@ -312,11 +312,12 @@ restart a process that is answering perfectly well.
 The whole contract is written down in [`api/openapi.yaml`](api/openapi.yaml):
 every status in that table, what the request body accepts, and the headers a
 preflight gets back. It is worth trusting because nothing about it is
-hand-maintained on the honour system — `internal/server/openapi_test.go`
-provokes every documented response out of the real handler and fails if one has
-moved, or if the spec describes one the service never returns. That table spent
-its whole life missing three codes, which is the argument for having a
-description a test can read.
+hand-maintained on the honour system. Both halves are held to the service —
+every documented response is provoked out of the real handler, and every limit
+the schema states is posted at the endpoint one character inside it and one
+character past. Change a limit in the code without changing the document and a
+test goes red. That table spent its whole life missing three codes, which is
+the argument for having a description a test can read.
 
 ## Behind a proxy
 
