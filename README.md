@@ -462,9 +462,20 @@ go test -tags=integration ./...  # runs a real mail server in a container
 The integration test starts Mailpit with testcontainers, posts real requests at
 the real composition root, and asserts real messages arrived in the right
 inboxes with the right `Reply-To`, subject and body. It needs a working Docker.
-The unit tests use a fake mailer and prove none of that — header encoding, CRLF
-handling and whether a reply actually reaches the sender only show up when
-something real parses the message.
+
+Underneath it, every mail adapter is held to one shared contract in
+[`internal/contact/mailertest`](internal/contact/mailertest). The `Mailer`
+interface says a send returns an error; the contract says what that error is —
+a typed `DeliveryError` naming the provider and the step it got to, with the
+cause still reachable underneath. It runs against the SMTP adapter, the Mailgun
+adapter, and the fake the handler tests use. Holding the fake to it is the
+point: a fake that fails differently from the real thing makes tests pass for a
+reason production does not reproduce.
+
+The SMTP adapter is driven over a real socket against a stub that speaks the
+protocol, so header encoding, the stripped line break and the lone dot in a body
+are covered without Docker. What still needs Mailpit is the last claim, and it
+is the one worth keeping: that a real mail server accepts what we compose.
 
 If you already have a Mailpit running, point the test at it and it will use that
 instead of starting one of its own:

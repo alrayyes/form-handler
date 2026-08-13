@@ -3,7 +3,6 @@
 package server_test
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -23,6 +22,7 @@ import (
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/ratelimit"
 	"github.com/alrayyes/form-handler/internal/server"
 )
@@ -139,18 +139,18 @@ func specCases() []specCase {
 	return []specCase{{
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusAccepted},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
-			return specSend(specForm(t, specStub{}, "", 100), http.MethodPost, "/contact", specBody, specOrigin)
+			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", specBody, specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusBadRequest},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
 			body := `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`
-			return specSend(specForm(t, specStub{}, "", 100), http.MethodPost, "/contact", body, specOrigin)
+			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", body, specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusForbidden},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
-			return specSend(specForm(t, specStub{}, "", 100), http.MethodPost, "/contact", specBody, "https://someone-else.example")
+			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", specBody, "https://someone-else.example")
 		},
 	}, {
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusNotFound},
@@ -162,12 +162,12 @@ func specCases() []specCase {
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusUnprocessableEntity},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
 			body := `{"name":"","email":"ada@example.com","message":"long enough to pass"}`
-			return specSend(specForm(t, specStub{}, "", 100), http.MethodPost, "/contact", body, specOrigin)
+			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", body, specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusTooManyRequests},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
-			h := specForm(t, specStub{}, "", 1)
+			h := specForm(t, mailertest.NewFake(), "", 1)
 			require.Equal(t, http.StatusAccepted,
 				specSend(h, http.MethodPost, "/contact", specBody, specOrigin).Code,
 				"the setup never spent the one submission the limit allows")
@@ -179,19 +179,19 @@ func specCases() []specCase {
 			// Parses, so it survives startup, and fails at execution because
 			// .Name is a string with no such field. That is the only way this
 			// service reaches a 500, and it is why the spec can claim one.
-			h := specForm(t, specStub{}, "{{ .Name.Missing }}", 100)
+			h := specForm(t, mailertest.NewFake(), "{{ .Name.Missing }}", 100)
 			return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusBadGateway},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
-			h := specForm(t, specStub{err: errUndeliverable}, "", 100)
+			h := specForm(t, mailertest.NewFake().Breaks(io.ErrUnexpectedEOF), "", 100)
 			return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodOptions, "/contact/{form}", http.StatusNoContent},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
-			return specSend(specForm(t, specStub{}, "", 100), http.MethodOptions, "/contact", "", specOrigin)
+			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodOptions, "/contact", "", specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodOptions, "/contact/{form}", http.StatusNotFound},
@@ -202,7 +202,7 @@ func specCases() []specCase {
 	}, {
 		responseKey: responseKey{http.MethodGet, "/contact/{form}", http.StatusMethodNotAllowed},
 		send: func(t *testing.T) *httptest.ResponseRecorder {
-			return specSend(specForm(t, specStub{}, "", 100), http.MethodGet, "/contact", "", specOrigin)
+			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodGet, "/contact", "", specOrigin)
 		},
 	}, {
 		responseKey: responseKey{http.MethodGet, "/healthz", http.StatusOK},
@@ -318,14 +318,6 @@ func assertMatchesSpec(t *testing.T, want specResponse, res *httptest.ResponseRe
 	require.NoError(t, err)
 	assert.JSONEq(t, string(example), res.Body.String())
 }
-
-// specStub stands in for the mail server, so that a 202 does not need one
-// running and a 502 does not need one broken.
-type specStub struct{ err error }
-
-func (s specStub) Send(context.Context, contact.Message) error { return s.err }
-
-var errUndeliverable = contact.Undeliverable("smtp", "dial", io.ErrUnexpectedEOF)
 
 func specForm(t *testing.T, m contact.Mailer, subject string, perHour int) *contact.Handler {
 	t.Helper()
