@@ -127,9 +127,11 @@ jobs:
       - name: prettier --check
         # YAML as well as Markdown. Every workflow, every config: it is the
         # other format Biome does not take, and this job is where it lands.
-        run: bunx prettier --check "**/*.{md,yml,yaml}"
+        # The glob lives in package.json so the pre-push hook runs this exact
+        # command, rather than a copy of it that can drift.
+        run: bun run format:check
       - name: markdownlint
-        run: bunx markdownlint-cli2
+        run: bun run lint:md
 
   # Biome takes every file type it supports, which in a Go repository is the
   # JSON: the tooling manifests, the linter configs, and what release-please
@@ -144,9 +146,9 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - name: biome
-        # The same command the pre-push hook runs. `check` is format and lint
-        # together, reporting rather than writing.
-        run: bunx biome check .
+        # Literally the same command the pre-push hook runs, not a copy of it.
+        # `check` is format and lint together, reporting rather than writing.
+        run: bun run lint:json
 
   # A hook is something you can skip, and the version number depends on these
   # messages being right, so the whole branch is checked here as well.
