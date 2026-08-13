@@ -15,6 +15,9 @@
     "lefthook"
   ],
   "scripts": {
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "format:check": "prettier --check \"**/*.{md,yml,yaml}\"",
+    "lint:md": "markdownlint-cli2",
+    "lint:json": "biome check ."
   }
 }

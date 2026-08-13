@@ -57,14 +57,17 @@ pre-push:
     - name: test
       run: go test ./...
 
+    # These three are `package.json` scripts rather than the commands spelled
+    # out, because CI runs the same three and a literal copied into two files
+    # drifts the first time somebody edits one of them.
     - name: prettier
-      run: bunx prettier --check "**/*.{md,yml,yaml}"
+      run: bun run format:check
 
     - name: markdownlint
-      run: bunx markdownlint-cli2
+      run: bun run lint:md
 
     - name: biome
-      run: bunx biome check .
+      run: bun run lint:json
 
     # The integration test is not here on purpose: it wants a Docker daemon and
     # takes the better part of a minute, which is more than a push should cost.
