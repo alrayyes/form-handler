@@ -4,7 +4,6 @@ package contact
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -145,33 +144,35 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := Validate(sub)
-	switch {
-	case errors.Is(err, ErrSpam):
+	// Every way this can be turned down is a case here, because Rejection is a
+	// closed set. There is no fallback branch, and there is nothing for one to
+	// catch.
+	msg, rejected := Validate(sub)
+	switch rejected := rejected.(type) {
+	case nil:
+		// Accepted. The send is below.
+	case spam:
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
 		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
 			"reason", "honeypot", "ip", h.clientIP.From(r), "origin", logsafe.String(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 		return
-	case err != nil:
-		var ve ValidationError
-		if errors.As(err, &ve) {
-			h.refuse(w, r, http.StatusUnprocessableEntity, errorBody{
-				Error: "invalid submission", Field: ve.Field, Reason: ve.Reason,
-			}, "field", ve.Field, "why", ve.Reason)
-			return
-		}
-		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "invalid submission"})
+	case ValidationError:
+		h.refuse(w, r, http.StatusUnprocessableEntity, errorBody{
+			Error: "invalid submission", Field: rejected.Field, Reason: rejected.Reason,
+		}, "field", rejected.Field, "why", rejected.Reason)
 		return
 	}
 
-	if msg.Subject, err = h.subjectFor(msg); err != nil {
+	subject, err := h.subjectFor(msg)
+	if err != nil {
 		h.log.Error("could not build subject", "form", h.form.ID,
 			"status", http.StatusInternalServerError, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody{Error: "could not send message"})
 		return
 	}
+	msg.Subject = subject
 
 	if err := h.mailer.Send(r.Context(), msg); err != nil {
 		// The sender's address is theirs, not ours to log in full on a failure

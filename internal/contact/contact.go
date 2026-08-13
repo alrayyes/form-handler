@@ -4,7 +4,6 @@ package contact
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/mail"
 	"strings"
@@ -83,9 +82,35 @@ const (
 	MinMessageLen = 10
 )
 
+// Rejection is why a submission was not accepted, and the set of answers is
+// closed: an unexported method means nothing outside this package can be one.
+// There are two, ErrSpam and ValidationError, and a caller that has handled
+// both has handled everything.
+//
+// Worth the extra type because the alternative was a promise in a comment. The
+// handler used to carry a branch for an error kind Validate could not return,
+// answering a 400 nothing could provoke — dead on the day it was written, and
+// impossible to describe in the API spec, since a documented response that
+// never happens fails the conformance test. Closing the set is what lets that
+// branch go.
+type Rejection interface {
+	error
+	// rejection is unexported on purpose. It is the whole mechanism: a type in
+	// another package cannot implement it, so this file lists every Rejection
+	// there is.
+	rejection()
+}
+
+// spam exists so ErrSpam can be a Rejection. errors.New returns a type from
+// somewhere else, and a method cannot be hung on that.
+type spam struct{}
+
+func (spam) Error() string { return "submission looks automated" }
+func (spam) rejection()    {}
+
 // ErrSpam means the submission looked automated. Callers should answer as if it
 // succeeded: telling a bot it was caught only teaches it what to change.
-var ErrSpam = errors.New("submission looks automated")
+var ErrSpam Rejection = spam{}
 
 // ValidationError names the field that was wrong, so the browser can point at
 // it instead of showing a generic failure.
@@ -98,11 +123,16 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Field, e.Reason)
 }
 
+func (ValidationError) rejection() {}
+
 // Validate checks a submission and returns the message to deliver.
+//
+// The Rejection rather than a bare error is the signature carrying its own
+// promise: this fails in exactly two ways, and both are in this file.
 //
 // Trims first, then measures. " " in a required field is absence with extra
 // steps, and counting it as present lets an empty message through.
-func Validate(s Submission) (Message, error) {
+func Validate(s Submission) (Message, Rejection) {
 	if strings.TrimSpace(s.Website) != "" {
 		return Message{}, ErrSpam
 	}
