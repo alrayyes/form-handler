@@ -90,6 +90,15 @@ jobs:
             gh issue comment "$existing" --body-file body.md
             echo "Updated issue #$existing" >> "$GITHUB_STEP_SUMMARY"
           else
+            # Made here rather than assumed to exist. A label somebody set up by
+            # hand once is not something the report should depend on: while it
+            # was missing, `gh issue create --label` exited 1 *after* the check
+            # had already found the drift, so the run went red saying "image
+            # pins failed" and what it found went nowhere. --force makes this
+            # idempotent, so a fork reports the same as this repo does.
+            gh label create dependencies \
+              --description "A pinned dependency needs a look" \
+              --color 0366d6 --force
             gh issue create --title "$TITLE" --body-file body.md --label dependencies
           fi
 
