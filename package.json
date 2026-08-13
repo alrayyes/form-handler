@@ -21,6 +21,7 @@
     "lint:md": "markdownlint-cli2",
     "lint:json": "biome check .",
     "lint:api": "redocly lint",
-    "lint:prose": "./scripts/lint-prose.sh"
+    "lint:prose": "./scripts/lint-prose.sh",
+    "lint:mechanics": "./scripts/lint-mechanics.sh"
   }
 }

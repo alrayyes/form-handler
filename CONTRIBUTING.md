@@ -212,7 +212,14 @@ and spelling and fails the build, because those have a right answer. `style`
 runs Vale for the house voice and mostly warns, because style advice that
 blocks a merge teaches people to skip the hooks. Product names go in
 `styles/config/vocabularies/House/accept.txt` and in `.ltex.json`, not in an
-ignore comment.
+ignore comment — both files, because Vale and LTeX keep separate dictionaries
+and neither reads the other.
+
+Both run at push as well, from the same scripts, so a pipeline should not be
+the first place you learn about a misspelt product name. `mechanics` fetches
+ltex-ls-plus on first use: around 300 MB, cached outside the repository, and
+about ten seconds a run after that. The pre-push jobs run in parallel, so it
+costs roughly what the whole hook used to.
 
 Prettier decides Markdown layout and markdownlint judges what Prettier
 produced. If the two ever disagree, Prettier wins and the markdownlint rule

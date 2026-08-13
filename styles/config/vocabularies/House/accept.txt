@@ -48,6 +48,7 @@ stdout
 stderr
 healthcheck
 misconfiguration
+misspelt
 ruleset
 rulesets
 fixups
