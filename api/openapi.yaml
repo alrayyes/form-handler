@@ -1,0 +1,387 @@
+# The contract, and the only machine-readable description of it. Held to the
+# service by internal/server/openapi_test.go, which provokes every response
+# below out of the real handler and fails if one of them has moved — the README
+# spent its whole life missing three status codes, and nothing noticed.
+openapi: 3.1.0
+
+info:
+  title: form-handler
+  summary: Turns a contact form submission into an email.
+  description: |
+    One endpoint per configured form. Each has its own allowed origins, its own
+    recipient and its own rate limit, so several sites can share a deployment
+    without sharing an inbox.
+
+    There is no authentication. What stands in for it is the `Origin` header,
+    checked against the list configured for that form and enforced server-side
+    rather than left to the browser. A form with no origins configured accepts
+    nothing.
+  version: 1.0.0
+  license:
+    name: GPL-3.0-or-later
+    identifier: GPL-3.0-or-later
+  contact:
+    name: form-handler
+    url: https://github.com/alrayyes/form-handler
+
+servers:
+  - url: "{scheme}://{host}"
+    description: |
+      There is no canonical host. This is a self-hosted service that runs
+      wherever you put it, usually behind a proxy that terminates TLS, so the
+      variables below are the shape of the answer rather than the answer.
+    variables:
+      scheme:
+        default: https
+        enum: [https, http]
+      host:
+        default: localhost:8080
+        description: The default listen address. Set ADDR to change it.
+
+# Deliberately empty rather than absent: there is no authentication, and this
+# is how a spec says so. The Origin header is what stands in for it, and it is
+# documented as a parameter on the operations that check it.
+security: []
+
+tags:
+  - name: contact
+    description: Submitting a form.
+  - name: health
+    description: Liveness, for whatever supervises the process.
+
+paths:
+  /contact/{form}:
+    description: |
+      One path per configured form. `/contact` with no id is an alias for the
+      form called `default` — the same handler, sharing its rate limit — and is
+      what every version before multi-form support answered on.
+    get:
+      operationId: contactMethodNotAllowed
+      summary: Refuse any method other than POST or OPTIONS
+      description: |
+        Documented as GET because OpenAPI has no way to say "every other
+        method", but nothing about this is specific to GET: PUT, DELETE and the
+        rest are answered identically.
+      tags: [contact]
+      parameters:
+        - $ref: "#/components/parameters/form"
+      responses:
+        "405":
+          description: The method is not one this endpoint answers.
+          headers:
+            Allow:
+              description: The methods that are allowed.
+              schema:
+                type: string
+                const: POST, OPTIONS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: method not allowed
+
+    options:
+      operationId: contactPreflight
+      summary: Answer a CORS preflight
+      description: |
+        The CORS headers are only added when the `Origin` is one this form
+        allows. A preflight from anywhere else is still answered `204`, without
+        them, which is what makes the browser refuse the request that follows.
+      tags: [contact]
+      parameters:
+        - $ref: "#/components/parameters/form"
+        - $ref: "#/components/parameters/origin"
+      responses:
+        "204":
+          description: Preflight answered. No body.
+          headers:
+            Access-Control-Allow-Methods:
+              description: The methods this endpoint answers.
+              schema:
+                type: string
+                const: POST, OPTIONS
+            Access-Control-Allow-Headers:
+              description: The request headers a browser may send.
+              schema:
+                type: string
+                const: Content-Type
+            Access-Control-Max-Age:
+              description: How long a browser may cache this preflight, in seconds.
+              schema:
+                type: string
+                const: "86400"
+            Access-Control-Allow-Origin:
+              description: The origin, echoed back. Absent if it is not allowed.
+              schema:
+                type: string
+            Vary:
+              description: The answer depends on the origin, so caches must not share it.
+              schema:
+                type: string
+                const: Origin
+        "404":
+          $ref: "#/components/responses/UnknownForm"
+
+    post:
+      operationId: submitContactForm
+      summary: Submit a form
+      description: |
+        Accepts the submission and sends it on. `202` rather than `201`: there
+        is no resource to point at, and delivery has been handed to a mail
+        server that will finish it after this response.
+
+        The order matters and is deliberate. The origin is checked before the
+        rate limit, so a refused origin cannot spend a visitor's allowance for
+        them, and the body is capped at 64 KiB before it is read rather than
+        after.
+
+        `Content-Type` is not checked. Anything that parses as JSON is accepted
+        whatever it claims to be.
+      tags: [contact]
+      parameters:
+        - $ref: "#/components/parameters/form"
+        - $ref: "#/components/parameters/origin"
+      requestBody:
+        required: true
+        description: |
+          Unknown fields are rejected outright rather than ignored, so a client
+          sending a field this service has never heard of finds out.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Submission"
+      responses:
+        "202":
+          description: |
+            Accepted for delivery. Also exactly what a submission caught by the
+            honeypot gets, headers and body identical: telling a bot it was
+            caught only teaches it which field to leave alone next time.
+          headers:
+            Access-Control-Allow-Origin:
+              description: The origin, echoed back.
+              schema:
+                type: string
+            Vary:
+              description: The answer depends on the origin, so caches must not share it.
+              schema:
+                type: string
+                const: Origin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Accepted"
+              example:
+                status: accepted
+        "400":
+          description: |
+            The body could not be read: malformed JSON, a field this service
+            does not know, or more than 64 KiB of it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: could not read submission
+        "403":
+          description: |
+            The `Origin` is not one this form allows, or there was no `Origin`
+            at all. Nothing was sent and nothing was counted against the rate
+            limit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: origin not allowed
+        "404":
+          $ref: "#/components/responses/UnknownForm"
+        "422":
+          description: |
+            A field is wrong. `field` and `reason` name which and why, so the
+            page can point at the input rather than showing a general failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+              example:
+                error: invalid submission
+                field: name
+                reason: required
+        "429":
+          description: |
+            This client has used its allowance for the hour. The window is fixed
+            and per form, and carries no `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: too many submissions, try later
+        "500":
+          description: |
+            The form's subject template would not render. A configuration fault
+            rather than anything the client did, and the only way this service
+            reaches a `500`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: could not send message
+        "502":
+          description: |
+            The mail server refused the message or could not be reached. The
+            submission was valid; retrying later is reasonable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: could not send message
+
+  /healthz:
+    get:
+      operationId: health
+      summary: Liveness
+      description: |
+        Deliberately does not test SMTP. A mail server being briefly
+        unreachable is not a reason for an orchestrator to restart a process
+        that is answering perfectly well.
+      tags: [health]
+      responses:
+        "200":
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+              example:
+                status: ok
+
+components:
+  parameters:
+    form:
+      name: form
+      in: path
+      required: true
+      description: |
+        The form's id, which is the last path segment and so has to survive
+        being in a URL.
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]*$"
+        examples: [default, careers]
+
+    origin:
+      name: Origin
+      in: header
+      required: true
+      description: |
+        Set by the browser, and checked against the list configured for this
+        form. Required in the sense that matters: a request without one is
+        refused, because "nobody is allowed" must not be read as "everybody is".
+      schema:
+        type: string
+        examples: [https://www.example.com]
+
+  responses:
+    UnknownForm:
+      description: |
+        No form is configured under that id. Answered as JSON rather than
+        `net/http`'s plain text, so a client only ever has one shape to parse.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: unknown form
+
+  schemas:
+    Submission:
+      type: object
+      description: |
+        Every field is trimmed of surrounding whitespace before it is measured,
+        so a field holding only spaces counts as absent rather than present.
+      additionalProperties: false
+      required: [name, email, message]
+      properties:
+        name:
+          type: string
+          description: Reaches the subject line, with any line breaks stripped.
+          minLength: 1
+          maxLength: 100
+          examples: [Ada Lovelace]
+        email:
+          type: string
+          format: email
+          description: |
+            Parsed by Go's `net/mail`. A display name is refused —
+            `Ada <ada@example.com>` is not accepted, only the address itself.
+            The limit is 254 bytes, RFC 5321's maximum, so an address in a
+            multi-byte script reaches it sooner than the character count
+            suggests.
+          minLength: 1
+          maxLength: 254
+          examples: [ada@example.com]
+        message:
+          type: string
+          description: |
+            The body of the mail. The lower bound is there because a form that
+            accepts "hi" is a form that fills an inbox with "hi".
+          minLength: 10
+          maxLength: 5000
+          examples: [Please get in touch about an awkward system.]
+        website:
+          type: string
+          description: |
+            The honeypot. Hidden from people, so anything that fills it in is
+            automated. Send it empty or leave it out. Named something a bot
+            would want to fill rather than `honeypot`.
+          examples: [""]
+
+    Accepted:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: accepted
+          description: Always `accepted`.
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+          description: Always `ok`.
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: |
+            What went wrong, in terms safe to show a visitor. The detail that
+            names the offending field goes to the log, not to the client.
+          examples: [origin not allowed]
+
+    ValidationError:
+      type: object
+      description: An Error carrying which field was wrong and why.
+      required: [error, field, reason]
+      properties:
+        error:
+          type: string
+          const: invalid submission
+        field:
+          type: string
+          description: The field that failed.
+          enum: [name, email, message]
+        reason:
+          type: string
+          description: Why it failed.
+          enum: [required, too long, too short, not a valid address]

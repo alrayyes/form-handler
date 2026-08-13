@@ -308,6 +308,15 @@ is automated. Unknown fields are rejected outright.
 mail server being briefly unreachable is not a reason for an orchestrator to
 restart a process that is answering perfectly well.
 
+The whole contract is written down in [`api/openapi.yaml`](api/openapi.yaml):
+every status in that table, what the request body accepts, and the headers a
+preflight gets back. It is worth trusting because nothing about it is
+hand-maintained on the honour system — `internal/server/openapi_test.go`
+provokes every documented response out of the real handler and fails if one has
+moved, or if the spec describes one the service never returns. That table spent
+its whole life missing three codes, which is the argument for having a
+description a test can read.
+
 ## Behind a proxy
 
 Set `TRUSTED_PROXIES` to the addresses or CIDRs of whatever sits in front —
