@@ -33,6 +33,18 @@ pre-commit:
     # over LSP, not here.
     - name: vale
       glob: "*.md"
+      # The same two the CI job leaves out, and for the same reason: the
+      # Contributor Covenant is somebody else's document and the changelog is
+      # written by the release job. Both are prose nobody here composed, and
+      # holding them to house style fails a commit over a `ci:` scope in a
+      # generated line.
+      #
+      # Vale is the one linter whose exclusions cannot live in its own config,
+      # so unlike Prettier and markdownlint it has to be told twice. When it
+      # was only told once, correcting the changelog by hand was impossible.
+      exclude:
+        - "CODE_OF_CONDUCT.md"
+        - "CHANGELOG.md"
       run: vale {staged_files}
 
     # Biome owns every file type it supports, which here is the JSON and
