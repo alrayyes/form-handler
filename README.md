@@ -36,10 +36,10 @@ To work on it, additionally:
 
 - **Docker**, for the integration test — it starts a real mail server in a
   container. Not needed to build the image: `ko` does that without a daemon.
-- **[lefthook](https://lefthook.dev)** for the git hooks, and
-  **[bun](https://bun.sh)** to install the linters that are not Go — commitlint,
-  Prettier, markdownlint and Biome. There is a `package.json`, but nothing here
-  is JavaScript; it exists only so those tools resolve.
+- **[bun](https://bun.sh)** to install the tooling that is not Go — commitlint,
+  Prettier, markdownlint, Biome and the [lefthook](https://lefthook.dev) that
+  runs the git hooks. There is a `package.json`, but nothing here is JavaScript;
+  it exists only so those tools resolve and stay pinned.
 - **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
   hook runs from your `PATH` while CI runs it pinned. Install that version
   rather than whichever is current: when the two disagree, the hook passes and
@@ -71,12 +71,12 @@ check what built it and from which commit:
 gh attestation verify oci://ghcr.io/alrayyes/form-handler:latest --repo alrayyes/form-handler
 ```
 
-Working on it? Install the linters and the hooks once — an uninstalled hook
-silently does nothing, which is worse than not having one:
+Working on it? One command installs the linters and the git hooks — an
+uninstalled hook silently does nothing, which is worse than not having one, so
+`prepare` puts them in for you:
 
 ```sh
 bun install
-lefthook install
 ```
 
 ## Running it
