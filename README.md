@@ -37,7 +37,8 @@ To work on it, additionally:
 - **Docker**, for the integration test — it starts a real mail server in a
   container. Not needed to build the image: `ko` does that without a daemon.
 - **[bun](https://bun.sh)** to install the tooling that is not Go — commitlint,
-  Prettier, markdownlint, Biome and the [lefthook](https://lefthook.dev) that
+  Prettier, markdownlint, Biome, the [Redocly](https://redocly.com/docs/cli)
+  that lints the API description, and the [lefthook](https://lefthook.dev) that
   runs the git hooks. There is a `package.json`, but nothing here is JavaScript;
   it exists only so those tools resolve and stay pinned.
 - **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit

@@ -8,6 +8,7 @@ GitLab
 Mailgun
 Mailpit
 Prettier
+Redocly
 Renovate
 [Ss]corecard
 Traefik
@@ -33,6 +34,7 @@ CIDR
 CIDRs
 UTF-8
 honeypot
+OpenAPI
 allowlist
 changelog
 runbook
