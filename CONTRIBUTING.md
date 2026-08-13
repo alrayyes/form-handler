@@ -6,19 +6,20 @@ tests?"
 
 ## Getting set up
 
-You need Go, [bun](https://bun.sh) for the two linters that are not Go,
-[lefthook](https://lefthook.dev) for the git hooks, and
+You need Go, [bun](https://bun.sh) for the linters that are not Go, and
 [golangci-lint](https://golangci-lint.run) v2.12.2 — that version specifically,
 because CI runs it pinned and a newer one locally will disagree with the
 pipeline in ways the failure does not explain.
 
 ```sh
 bun install
-lefthook install
 ```
 
-Install the hooks. An uninstalled hook silently does nothing, which is worse
-than not having one — you find out at the pipeline instead of at the commit.
+That installs the git hooks too. [lefthook](https://lefthook.dev) is pinned in
+`package.json` like everything else here, and the `prepare` script runs
+`lefthook install` for you. An uninstalled hook silently does nothing, which is
+worse than not having one — you find out at the pipeline instead of at the
+commit.
 
 ## The shape of a change
 
