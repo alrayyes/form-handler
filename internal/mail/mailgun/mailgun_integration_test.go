@@ -27,10 +27,13 @@ import (
 	"testing"
 	"time"
 
+	mg "github.com/mailgun/mailgun-go/v5"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/mail/mailgun"
 )
 
@@ -70,6 +73,29 @@ func stubMailgun(t *testing.T, status int, body string) (baseURL string, got *ca
 }
 
 const accepted = `{"id":"<20260811.1@mg.example.com>","message":"Queued. Thank you."}`
+
+const refused = `{"message":"Invalid private key"}`
+
+// The contract every Mailer keeps, run against this one.
+//
+// This is the assertion that the two adapters are interchangeable where it
+// matters. One speaks SMTP over a socket and the other HTTP to a hosted API,
+// they fail at completely different things, and the handler must not be able to
+// tell which it is holding — it reads Provider and Op off a DeliveryError and
+// answers 502 either way.
+func TestTheSenderKeepsTheMailerContract(t *testing.T) {
+	mailertest.Contract(t, mailertest.Subject{
+		Provider: "mailgun",
+		Working: func(t *testing.T) contact.Mailer {
+			baseURL, _ := stubMailgun(t, http.StatusOK, accepted)
+			return mustSender(t, baseURL)
+		},
+		Failing: func(t *testing.T) contact.Mailer {
+			baseURL, _ := stubMailgun(t, http.StatusUnauthorized, refused)
+			return mustSender(t, baseURL)
+		},
+	})
+}
 
 func TestSendReachesMailgunAsThatDomain(t *testing.T) {
 	baseURL, got := stubMailgun(t, http.StatusOK, accepted)
@@ -130,7 +156,7 @@ func TestSendCarriesWhoSubmittedItInTheBody(t *testing.T) {
 // A refused send must be reported, not swallowed. A form that says "thanks" and
 // drops the message is worse than one that says it failed.
 func TestARefusedSendIsAnError(t *testing.T) {
-	baseURL, _ := stubMailgun(t, http.StatusUnauthorized, `{"message":"Invalid private key"}`)
+	baseURL, _ := stubMailgun(t, http.StatusUnauthorized, refused)
 
 	sender := mustSender(t, baseURL)
 	err := sender.Send(context.Background(), contact.Message{
@@ -144,6 +170,24 @@ func TestARefusedSendIsAnError(t *testing.T) {
 	var de *contact.DeliveryError
 	require.ErrorAs(t, err, &de)
 	assert.Equal(t, "mailgun", de.Provider)
+}
+
+// The shared contract can only ask whether something is under the
+// DeliveryError, because it does not know what this adapter talks to. Here we
+// do: Mailgun's own error carries the status code it got back, and the
+// difference between a 401 and a 429 is the difference between a key somebody
+// has to replace and a wait. Wrapping has to leave that reachable, so the
+// SMTP adapter's textproto reply and this stay equally recoverable.
+func TestARefusalKeepsMailgunsOwnStatusReachable(t *testing.T) {
+	baseURL, _ := stubMailgun(t, http.StatusUnauthorized, refused)
+
+	err := mustSender(t, baseURL).Send(context.Background(), contact.Message{
+		Name: "Ada", Email: "ada@example.com", Subject: "s", Body: "b",
+	})
+
+	var ue *mg.UnexpectedResponseError
+	require.ErrorAs(t, err, &ue, "Mailgun's own error was flattened into a string")
+	assert.Equal(t, http.StatusUnauthorized, ue.Actual)
 }
 
 func TestConfigIsCheckedWhenTheSenderIsBuilt(t *testing.T) {

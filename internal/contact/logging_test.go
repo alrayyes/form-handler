@@ -17,6 +17,7 @@ import (
 
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
 
@@ -32,7 +33,7 @@ func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
 	h, err := contact.NewHandler(contact.Form{
 		ID:      "marketing",
 		Origins: []string{origin},
-	}, &recorder{}, ratelimit.New(perHour, time.Hour), slog.New(slog.NewJSONHandler(&buf, nil)), clientip.Resolver{})
+	}, mailertest.NewFake(), ratelimit.New(perHour, time.Hour), slog.New(slog.NewJSONHandler(&buf, nil)), clientip.Resolver{})
 	require.NoError(t, err)
 
 	return h, func() []logged {

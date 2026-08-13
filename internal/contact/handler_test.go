@@ -3,13 +3,11 @@
 package contact_test
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -18,34 +16,11 @@ import (
 
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
 
 const origin = "https://www.example.com"
-
-// recorder is the fake for the port the handler consumes. Only the unit tests
-// use it; the integration test drives a real mail server instead.
-type recorder struct {
-	mu   sync.Mutex
-	sent []contact.Message
-	err  error
-}
-
-func (r *recorder) Send(_ context.Context, m contact.Message) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.err != nil {
-		return r.err
-	}
-	r.sent = append(r.sent, m)
-	return nil
-}
-
-func (r *recorder) count() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.sent)
-}
 
 func post(t *testing.T, h http.Handler, body, org string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -72,23 +47,23 @@ func newHandler(t *testing.T, m contact.Mailer, perHour int) *contact.Handler {
 }
 
 func TestPostSendsTheMessage(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
 
 	require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
-	assert.Equal(t, 1, mailer.count())
+	assert.Equal(t, 1, mailer.Count())
 }
 
 func TestOriginsOtherThanOursAreRefused(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, "https://someone-else.example")
 
 	require.Equal(t, http.StatusForbidden, res.Code)
 	// The point: refusing the CORS header is not enough, because the request
 	// still arrived and would still have sent mail.
-	assert.Zero(t, mailer.count(), "a disallowed origin still sent mail")
+	assert.Zero(t, mailer.Count(), "a disallowed origin still sent mail")
 }
 
 func TestPreflightIsAnswered(t *testing.T) {
@@ -96,39 +71,39 @@ func TestPreflightIsAnswered(t *testing.T) {
 	req.Header.Set("Origin", origin)
 	res := httptest.NewRecorder()
 
-	newHandler(t, &recorder{}, 100).ServeHTTP(res, req)
+	newHandler(t, mailertest.NewFake(), 100).ServeHTTP(res, req)
 
 	require.Equal(t, http.StatusNoContent, res.Code)
 	assert.Equal(t, origin, res.Header().Get("Access-Control-Allow-Origin"))
 }
 
 func TestHoneypotLooksExactlyLikeSuccess(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	body := `{"name":"Bot","email":"bot@example.com","message":"Cheap watches for sale.","website":"http://spam.example"}`
 
 	spam := post(t, newHandler(t, mailer, 100), body, origin)
-	good := post(t, newHandler(t, &recorder{}, 100), goodBody, origin)
+	good := post(t, newHandler(t, mailertest.NewFake(), 100), goodBody, origin)
 
 	assert.Equal(t, good.Code, spam.Code, "the difference tells a bot what to change")
 	assert.Equal(t, good.Body.String(), spam.Body.String())
-	assert.Zero(t, mailer.count(), "honeypot submission was delivered")
+	assert.Zero(t, mailer.Count(), "honeypot submission was delivered")
 }
 
 func TestValidationErrorNamesTheField(t *testing.T) {
-	res := post(t, newHandler(t, &recorder{}, 100), `{"name":"","email":"ada@example.com","message":"long enough to pass"}`, origin)
+	res := post(t, newHandler(t, mailertest.NewFake(), 100), `{"name":"","email":"ada@example.com","message":"long enough to pass"}`, origin)
 
 	require.Equal(t, http.StatusUnprocessableEntity, res.Code)
 	assert.Contains(t, res.Body.String(), `"field":"name"`)
 }
 
 func TestUnknownFieldsAreRejected(t *testing.T) {
-	res := post(t, newHandler(t, &recorder{}, 100), `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`, origin)
+	res := post(t, newHandler(t, mailertest.NewFake(), 100), `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`, origin)
 
 	require.Equal(t, http.StatusBadRequest, res.Code)
 }
 
 func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	h := newHandler(t, mailer, 2)
 
 	for i := range 2 {
@@ -139,7 +114,7 @@ func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
 	res := post(t, h, goodBody, origin)
 
 	require.Equal(t, http.StatusTooManyRequests, res.Code, "third submission")
-	assert.Equal(t, 2, mailer.count())
+	assert.Equal(t, 2, mailer.Count())
 }
 
 // The origin check comes first, and it has to. If the limiter counted refused
@@ -151,7 +126,7 @@ func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
 // CORS headers and the JSON decoder in ServeHTTP, where nobody rearranging that
 // function would think to look for it.
 func TestARefusedOriginDoesNotConsumeTheRateLimit(t *testing.T) {
-	h := newHandler(t, &recorder{}, 1)
+	h := newHandler(t, mailertest.NewFake(), 1)
 	refused := post(t, h, goodBody, "https://someone-else.example")
 	require.Equal(t, http.StatusForbidden, refused.Code, "the setup did not refuse the origin")
 
@@ -161,7 +136,7 @@ func TestARefusedOriginDoesNotConsumeTheRateLimit(t *testing.T) {
 }
 
 func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
-	mailer := &recorder{err: errors.New("mail server is down")}
+	mailer := mailertest.NewFake().Breaks(errors.New("mail server is down"))
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
 
@@ -174,7 +149,7 @@ func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
 // The subject is the form's, not the submission's: two forms on one service
 // word it differently, which is half of why they are separate forms.
 func TestTheFormsSubjectTemplateIsRendered(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	h, err := contact.NewHandler(contact.Form{
 		ID:      "careers",
 		Origins: []string{origin},
@@ -185,32 +160,32 @@ func TestTheFormsSubjectTemplateIsRendered(t *testing.T) {
 	res := post(t, h, goodBody, origin)
 
 	require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
-	require.Equal(t, 1, mailer.count())
-	assert.Equal(t, "careers: Ada <ada@example.com>", mailer.sent[0].Subject)
+	require.Equal(t, 1, mailer.Count())
+	assert.Equal(t, "careers: Ada <ada@example.com>", mailer.Sent()[0].Subject)
 }
 
 func TestAFormWithNoSubjectGetsTheDefault(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
 
 	require.Equal(t, http.StatusAccepted, res.Code)
-	require.Equal(t, 1, mailer.count())
-	assert.Equal(t, "Contact form: Ada", mailer.sent[0].Subject)
+	require.Equal(t, 1, mailer.Count())
+	assert.Equal(t, "Contact form: Ada", mailer.Sent()[0].Subject)
 }
 
 // The name reaches the subject line, and the name is whatever the visitor
 // typed. A newline in a header is how injection works.
 func TestSubjectCannotCarryAHeaderInjection(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	body := `{"name":"Ada\r\nBcc: everyone@example.com","email":"ada@example.com","message":"A message long enough to pass."}`
 
 	res := post(t, newHandler(t, mailer, 100), body, origin)
 
 	require.Equal(t, http.StatusAccepted, res.Code)
-	require.Equal(t, 1, mailer.count())
-	assert.NotContains(t, mailer.sent[0].Subject, "\r")
-	assert.NotContains(t, mailer.sent[0].Subject, "\n")
+	require.Equal(t, 1, mailer.Count())
+	assert.NotContains(t, mailer.Sent()[0].Subject, "\r")
+	assert.NotContains(t, mailer.Sent()[0].Subject, "\n")
 }
 
 func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
@@ -218,7 +193,7 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 		ID:      "broken",
 		Origins: []string{origin},
 		Subject: "Contact form: {{ .Name",
-	}, &recorder{}, ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
+	}, mailertest.NewFake(), ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 
 	require.Error(t, err, "a template that cannot parse was accepted")
 }
@@ -226,7 +201,7 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 // Fail closed. "Nobody is allowed" must not be read as "everybody is" — that
 // reading is how a contact form becomes an open relay for spam.
 func TestAFormWithNoOriginsAcceptsNothing(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	h, err := contact.NewHandler(contact.Form{ID: "misconfigured"},
 		mailer, ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
@@ -234,14 +209,14 @@ func TestAFormWithNoOriginsAcceptsNothing(t *testing.T) {
 	res := post(t, h, goodBody, origin)
 
 	require.Equal(t, http.StatusForbidden, res.Code)
-	assert.Zero(t, mailer.count())
+	assert.Zero(t, mailer.Count())
 }
 
 // The bug in issue #6. X-Forwarded-For is set by whoever sent the request, so
 // a service that believes it gives every caller a fresh rate-limit bucket per
 // request just by varying the header.
 func TestTheRateLimitCannotBeBypassedWithAForgedHeader(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	h := newHandler(t, mailer, 1)
 
 	first := postAs(t, h, "198.51.100.1")
@@ -250,13 +225,13 @@ func TestTheRateLimitCannotBeBypassedWithAForgedHeader(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, first.Code)
 	require.Equal(t, http.StatusTooManyRequests, second.Code,
 		"a second submission got its own bucket by claiming a different address")
-	assert.Equal(t, 1, mailer.count())
+	assert.Equal(t, 1, mailer.Count())
 }
 
 // And the reason it is read at all still works: a trusted proxy's header is
 // believed, so two real visitors behind one proxy are not one client.
 func TestBehindATrustedProxyVisitorsAreCountedSeparately(t *testing.T) {
-	mailer := &recorder{}
+	mailer := mailertest.NewFake()
 	resolver, err := clientip.NewResolver([]string{"192.0.2.0/24"})
 	require.NoError(t, err)
 	h, err := contact.NewHandler(contact.Form{
@@ -291,7 +266,7 @@ func TestGetIsNotAllowed(t *testing.T) {
 	req.Header.Set("Origin", origin)
 	res := httptest.NewRecorder()
 
-	newHandler(t, &recorder{}, 100).ServeHTTP(res, req)
+	newHandler(t, mailertest.NewFake(), 100).ServeHTTP(res, req)
 
 	require.Equal(t, http.StatusMethodNotAllowed, res.Code)
 }
