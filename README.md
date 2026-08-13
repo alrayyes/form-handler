@@ -532,7 +532,7 @@ compiles the binary and writes the layers itself over the registry API. That
 started as a workaround for a runner that would allow neither a Docker daemon nor
 `unshare(CLONE_NEWUSER)`, and stayed because it is faster and needs no qemu to
 build both architectures. What a Dockerfile would say now lives in `.ko.yaml`:
-the same distroless base, pinned to the same digest it always was.
+the same distroless base, still pinned by digest rather than following the tag.
 
 To build it yourself:
 
