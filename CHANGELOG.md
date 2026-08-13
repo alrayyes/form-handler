@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.4](https://github.com/alrayyes/form-handler/compare/v2.1.3...v2.1.4) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** let image-pins file the issue it found ([30c9102](https://github.com/alrayyes/form-handler/commit/30c9102614f31b8e220c5b4d9183ee8ae07ceae0))
+* **ci:** let image-pins file the issue it found ([6c2aeba](https://github.com/alrayyes/form-handler/commit/6c2aeba0d5dc1c55c613b73a2f4ef44af9446d73)), closes [#30](https://github.com/alrayyes/form-handler/issues/30)
+
 ## v2.1.3
 
 ### Fixes
