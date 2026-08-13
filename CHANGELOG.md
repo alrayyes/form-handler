@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.5](https://github.com/alrayyes/form-handler/compare/v2.1.4...v2.1.5) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** exclude the changelog from the vale hook ([633bcd8](https://github.com/alrayyes/form-handler/commit/633bcd821b6421a70ab649f9333d229aeb76cfda))
+* **ci:** run the grammar check at push, not only in CI ([5d9cdb8](https://github.com/alrayyes/form-handler/commit/5d9cdb8b9d439507bba9dadd20696a494ce9b1b0))
+* **ci:** run vale at push, from the same script as CI ([5499014](https://github.com/alrayyes/form-handler/commit/5499014efab2a77e6fd14cea799faa355a085672))
+* **ci:** widen the glob that triggers the spec linter ([da96289](https://github.com/alrayyes/form-handler/commit/da9628900ecebf88a24639385538af3e41572d32))
+* stop merge commits duplicating every changelog entry ([c457433](https://github.com/alrayyes/form-handler/commit/c457433f953d98c7df5ee9dd3ea86c04340f4f1c))
+
 ## [2.1.4](https://github.com/alrayyes/form-handler/compare/v2.1.3...v2.1.4) (2026-08-13)
 
 
