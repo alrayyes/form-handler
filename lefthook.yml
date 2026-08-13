@@ -102,6 +102,13 @@ pre-push:
     - name: redocly
       run: bun run lint:api
 
+    # Every other linter here runs at commit, at push and in CI. Vale ran at
+    # commit and then nothing until CI, because its invocation lived in the
+    # workflow as a block of bash with nothing a hook could reuse. It is a
+    # script now, and this is the whole-tree run that was missing.
+    - name: vale
+      run: bun run lint:prose
+
     # The integration test is not here on purpose: it wants a Docker daemon and
     # takes the better part of a minute, which is more than a push should cost.
     # CI runs it on every branch.
