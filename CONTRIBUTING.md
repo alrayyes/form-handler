@@ -10,8 +10,12 @@ whoever changes it.
 ## Getting set up
 
 - **Go 1.25 or newer.**
-- **Docker**, for the integration test — it starts a real mail server in a
-  container. Not needed to build the image: `ko` does that without a daemon.
+- **Docker**, for the integration test and the container test — the first
+  starts a real mail server in a container, the second starts the actual
+  image `ko` builds.
+- **[ko](https://ko.build) v0.19.1**, for the container test — it builds the
+  image the test runs. Install the version CI uses rather than whichever is
+  current, for the same reason as golangci-lint below.
 - **[bun](https://bun.sh)** for the tooling that is not Go — commitlint,
   Prettier, markdownlint, Biome, the [Redocly](https://redocly.com/docs/cli)
   that lints the API description, and the [lefthook](https://lefthook.dev) that
@@ -82,8 +86,9 @@ codes, because prose has no way of noticing.
 Write the test first, and write the outer one first.
 
 ```sh
-go test ./...                    # unit, plus the adapters against local stubs
-go test -tags=integration ./...  # the outer test, needs Docker
+go test ./...                     # unit, plus the adapters against local stubs
+go test -tags=integration ./...   # the outer test, needs Docker
+go test -tags=containertest ./... # the actual container, needs Docker and ko
 ```
 
 The integration test starts Mailpit with testcontainers, posts real requests at
@@ -126,6 +131,21 @@ server keeps its messages between tests, so the test empties the mailbox first.
 
 The integration test is behind a build tag so `go test ./...` stays fast. CI
 runs both.
+
+The container test, in `cmd/form-handler/container_test.go`, is a third and
+thinner tier. Everything above proves the Go code works and never touches the
+compiled binary — there is no Dockerfile, `ko` assembles the image
+(`.ko.yaml`), and this is the one test that runs it: builds it, starts it,
+posts a real request, and runs `--healthcheck` against the real distroless
+binary. It doesn't re-prove routing or header handling; the outer integration
+test already does that, faster. It exists for what only the shipped artifact
+can break — the entrypoint path (`/ko-app/form-handler`, not
+`/form-handler`), whether the container still starts and answers when
+configured purely by environment variables, and whether `--healthcheck` still
+works inside the real image. Set `FORM_HANDLER_IMAGE` to point it at an
+image already built, the same way `MAILPIT_SMTP_ADDR` points the integration
+test at a Mailpit already running; left unset, it builds one itself with
+`ko build --bare --local`.
 
 ## Decisions worth knowing
 
@@ -204,8 +224,9 @@ The same commands the hooks run, so a green pre-commit means a green lint
 stage: `gofmt` and `golangci-lint` over the Go, Prettier over the Markdown and
 the YAML and then markdownlint over the Markdown, Biome over the JSON,
 `redocly lint` over the API description, `go test` with the race detector, the
-integration test against a real Mailpit, a CodeQL pass, and a `ko build` to
-prove the image still assembles.
+integration test against a real Mailpit, a CodeQL pass, a `ko build` to prove
+the image still assembles, and the container test running that image for
+real.
 
 Prose gets two more jobs of its own. `mechanics` runs ltex-cli-plus for grammar
 and spelling and fails the build, because those have a right answer. `style`
