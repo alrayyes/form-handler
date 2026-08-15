@@ -33,11 +33,12 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          # The integration tests are behind a build tag, so without this they
-          # are invisible to the linter — which is how three findings sat in
-          # them unnoticed. They are the tests that matter most; they should be
-          # held to the same standard as what they test.
-          args: --build-tags=integration
+          # The integration and container tests are behind build tags, so
+          # without this they are invisible to the linter — which is how three
+          # findings sat in the integration test unnoticed. They are the tests
+          # that matter most; they should be held to the same standard as what
+          # they test.
+          args: --build-tags=integration,containertest
       - name: gofmt
         # golangci-lint's formatter reports rather than rewrites here; this is
         # the check that a file was committed unformatted.
@@ -206,3 +207,22 @@ jobs:
           KO_DOCKER_REPO: ko.local
           VERSION: ci
         run: ko build --bare --push=false ./cmd/form-handler
+
+  # Runs the image this job builds, not the code that builds it: starts the
+  # container, posts a real request, and checks --healthcheck against the
+  # actual binary. The runner already has a Docker daemon on the host — the
+  # same one the integration job's `services:` containers use — so this needs
+  # no privileged sidecar or socket mount, unlike testcontainers running the
+  # nested daemon a job container would need.
+  container:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: ko-build/setup-ko@61b4d1d396f5b2e7d6bb6fefdce3dc38d1a13445 # v0.10
+        with:
+          version: v0.19.1
+      - name: go test -tags=containertest
+        run: go test -race -tags=containertest ./...

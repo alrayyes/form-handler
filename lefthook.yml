@@ -12,9 +12,9 @@ pre-commit:
 
     - name: golangci-lint
       glob: "*.go"
-      # Same build tag CI uses, or the integration tests go unlinted here and
-      # fail there instead.
-      run: golangci-lint run --build-tags=integration ./...
+      # Same build tags CI uses, or the integration and container tests go
+      # unlinted here and fail there instead.
+      run: golangci-lint run --build-tags=integration,containertest ./...
 
     # Prettier decides the layout, markdownlint then judges what Prettier
     # produced. The other order has markdownlint fixing something Prettier is
@@ -122,6 +122,7 @@ pre-push:
     - name: mechanics
       run: bun run lint:mechanics
 
-    # The integration test is not here on purpose: it wants a Docker daemon and
-    # takes the better part of a minute, which is more than a push should cost.
-    # CI runs it on every branch.
+    # The integration and container tests are not here on purpose: both want a
+    # Docker daemon, the container test wants ko as well, and either takes the
+    # better part of a minute, which is more than a push should cost. CI runs
+    # them on every branch.
