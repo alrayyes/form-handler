@@ -19,9 +19,12 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       # Conventional Commits, because commitlint checks these messages and the
-      # version number is computed from them. chore: releases nothing, which is
-      # right for a dependency bump that changed no behaviour.
-      prefix: chore
+      # version number is computed from them. gomod ships in the built binary,
+      # so a bump here is a change to what ships whether or not it's
+      # security-relevant, and fix: cuts the patch release the same way any
+      # other fix does. github-actions below stays ci: — it changes the
+      # pipeline, not the artifact.
+      prefix: fix
       include: scope
     groups:
       # One pull request rather than thirty. The testcontainers tree alone
