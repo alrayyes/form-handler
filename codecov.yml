@@ -1,0 +1,6 @@
+# cmd/form-handler/main.go is the composition root - it wires the CLI up and
+# exits, so there's no behaviour in it that internal/cli's own tests don't
+# already cover. Measuring it here would just push the number back down
+# without testing anything.
+ignore:
+  - "cmd/form-handler/main.go"
