@@ -2,6 +2,7 @@
 # holds the prose to exactly these, so casing here is the casing everywhere.
 Cloudflare
 CodeQL
+Codecov
 Dependabot
 GitHub
 GitLab
