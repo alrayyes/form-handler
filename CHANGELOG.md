@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.6](https://github.com/alrayyes/form-handler/compare/v2.1.5...v2.1.6) (2026-08-17)
+
+
+### Bug Fixes
+
+* **deps:** commit-message prefix for the shipped ecosystem(s) ([#51](https://github.com/alrayyes/form-handler/issues/51)) ([cfa58bf](https://github.com/alrayyes/form-handler/commit/cfa58bf7d07c6d0525da17c86c90ad1ecbe20cc4))
+
 ## [2.1.5](https://github.com/alrayyes/form-handler/compare/v2.1.4...v2.1.5) (2026-08-13)
 
 
