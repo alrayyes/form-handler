@@ -62,6 +62,10 @@ jobs:
         with:
           files: coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
+          # Defaults to false, which means a broken upload has never once
+          # turned this job red. Worth enforcing now that CODECOV_TOKEN backs
+          # it instead of the tokenless fallback.
+          fail_ci_if_error: true
 
   # The outer test, and the one to trust. It posts real requests at the real
   # composition root and asserts real messages arrived in the right inboxes.
