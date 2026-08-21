@@ -1,6 +1,7 @@
 # form-handler
 
 [![CI](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alrayyes/form-handler/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/alrayyes/form-handler/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/alrayyes/form-handler/actions/workflows/codeql.yml)
 [![Codecov](https://codecov.io/gh/alrayyes/form-handler/graph/badge.svg)](https://codecov.io/gh/alrayyes/form-handler)
 [![release](https://img.shields.io/github/v/release/alrayyes/form-handler?sort=semver)](https://github.com/alrayyes/form-handler/releases/latest)
 [![image](https://img.shields.io/badge/ghcr.io-form--handler-2496ED?logo=docker&logoColor=white)](https://github.com/alrayyes/form-handler/pkgs/container/form-handler)
