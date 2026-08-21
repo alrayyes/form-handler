@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.7](https://github.com/alrayyes/form-handler/compare/v2.1.6...v2.1.7) (2026-08-21)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/moby/go-archive from 0.2.0 to 0.3.0 ([#54](https://github.com/alrayyes/form-handler/issues/54)) ([117cec6](https://github.com/alrayyes/form-handler/commit/117cec689f4fed0ad3fb70fdf54c7e0e23b58229))
+
 ## [2.1.6](https://github.com/alrayyes/form-handler/compare/v2.1.5...v2.1.6) (2026-08-17)
 
 
