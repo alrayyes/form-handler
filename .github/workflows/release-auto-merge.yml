@@ -1,0 +1,39 @@
+# release-please keeps its release pull request open and up to date, but
+# somebody still has to merge it to cut the release. This asks GitHub to do
+# that once every required check is green, the same way dependabot-auto-merge
+# does for a dependency bump - nothing is merged here directly, and a red
+# pipeline leaves the release pull request sitting open same as always.
+name: release auto-merge
+
+on:
+  pull_request_target:
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    # pull_request_target runs with a write-capable token against the base
+    # branch, so it must never check out or run the pull request's code. It
+    # does not: every step below talks to the API and nothing else.
+    #
+    # Both the author and the branch prefix are checked, not just one - the
+    # author alone would also match a github-actions[bot] pull request this
+    # repo grows later for something that isn't a release.
+    if: |
+      github.event.pull_request.user.login == 'github-actions[bot]' &&
+      startsWith(github.event.pull_request.head.ref, 'release-please--branches-')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          # Squash, matching how every release pull request before this one
+          # was merged by hand - the pull request already carries one commit,
+          # so this changes who clicks the button, not the shape of history.
+          gh pr merge --auto --squash "$PR_URL"
