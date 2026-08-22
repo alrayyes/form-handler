@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/alrayyes/form-handler/compare/v2.1.7...v2.2.0) (2026-08-22)
+
+
+### Features
+
+* **ci:** auto-merge the release-please pull request ([#65](https://github.com/alrayyes/form-handler/issues/65)) ([c00c02a](https://github.com/alrayyes/form-handler/commit/c00c02abcd09fc037b88101422bda4970a40aad3)), closes [#64](https://github.com/alrayyes/form-handler/issues/64)
+
+
+### Bug Fixes
+
+* **ci:** pin the README Codecov badge to the master branch ([#63](https://github.com/alrayyes/form-handler/issues/63)) ([6d3e27d](https://github.com/alrayyes/form-handler/commit/6d3e27da93afcad5c11d23ca97bf7c8b3ece1e5a)), closes [#62](https://github.com/alrayyes/form-handler/issues/62)
+* **ci:** point codecov at the master branch ([#60](https://github.com/alrayyes/form-handler/issues/60)) ([9117aa6](https://github.com/alrayyes/form-handler/commit/9117aa64125a5bd4008f3b9d03c42d88432d8089))
+
 ## [2.1.7](https://github.com/alrayyes/form-handler/compare/v2.1.6...v2.1.7) (2026-08-21)
 
 
