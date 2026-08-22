@@ -1,3 +1,10 @@
+# Codecov's own default-branch setting still says "main" from before this
+# repo ever pushed a commit to it - GitHub's default is "master", and the
+# mismatch is why the repo-level graph badge showed "unknown" despite every
+# upload succeeding: it was reading totals off a branch with no commits.
+codecov:
+  branch: master
+
 # cmd/form-handler/main.go is the composition root - it wires the CLI up and
 # exits, so there's no behaviour in it that internal/cli's own tests don't
 # already cover. Measuring it here would just push the number back down
