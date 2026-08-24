@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/alrayyes/form-handler/compare/v2.2.0...v2.2.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** skip the Codecov upload on Dependabot pull requests ([#70](https://github.com/alrayyes/form-handler/issues/70)) ([fb76bfe](https://github.com/alrayyes/form-handler/commit/fb76bfec3d1a56a7041a879917ebe3b39084f78d)), closes [#69](https://github.com/alrayyes/form-handler/issues/69)
+
 ## [2.2.0](https://github.com/alrayyes/form-handler/compare/v2.1.7...v2.2.0) (2026-08-22)
 
 
