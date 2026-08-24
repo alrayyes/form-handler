@@ -58,6 +58,12 @@ jobs:
           go tool cover -func=coverage.out | tail -1 |
             awk '{ print "**Coverage: " $3 "**" }' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage to Codecov
+        # GitHub withholds repo secrets from Dependabot-triggered runs, so
+        # CODECOV_TOKEN is empty here — exposing it as a Dependabot secret
+        # instead would hand a compromised dependency a way to exfiltrate it
+        # during this same `go test`. Skip the upload rather than fail the
+        # job on a token this run was never going to have.
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: coverage.out
