@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.2.2](https://github.com/alrayyes/form-handler/compare/v2.2.1...v2.2.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **ci:** scan dependencies with govulncheck ([#78](https://github.com/alrayyes/form-handler/issues/78)) ([8f06269](https://github.com/alrayyes/form-handler/commit/8f06269995d82341cbe66cb44db02d6a09cafb84))
+* **deps:** bump github.com/mailgun/mailgun-go/v5 ([#73](https://github.com/alrayyes/form-handler/issues/73)) ([b51c9ea](https://github.com/alrayyes/form-handler/commit/b51c9ea0ff0b16c478c81825b0a3278f54e7e783))
+* **deps:** update pinned distroless base image digest ([#75](https://github.com/alrayyes/form-handler/issues/75)) ([78aa1a4](https://github.com/alrayyes/form-handler/commit/78aa1a46f010935e5ea8705851671734139ef243)), closes [#68](https://github.com/alrayyes/form-handler/issues/68)
+* **docs:** extend markdownlint's shared prettier style ([#80](https://github.com/alrayyes/form-handler/issues/80)) ([e87366f](https://github.com/alrayyes/form-handler/commit/e87366f2e6ede8fa1c2cd6866bae9e9f46e95daf))
+
 ## [2.2.1](https://github.com/alrayyes/form-handler/compare/v2.2.0...v2.2.1) (2026-08-24)
 
 
