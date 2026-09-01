@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.{cmd,bat,ps1} text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Large, machine-generated. A diff view collapses these instead of rendering
+# thousands of unreadable lines.
+go.sum -diff linguist-generated
+bun.lock -diff
