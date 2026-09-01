@@ -4,6 +4,11 @@
 globs:
   - "**/*.md"
 
+# markdownlint's own style file for the rules Prettier already decides —
+# heading style, blanks around headings and lists, fence style, trailing
+# spaces and the rest. Drops MD013, re-enabled below under its alias.
+extends: "markdownlint/style/prettier"
+
 ignores:
   - CHANGELOG.md # written by the release job, not by hand
   # The Contributor Covenant, verbatim. Vendored prose belongs to whoever wrote
@@ -29,7 +34,13 @@ config:
   # writing a heading that renders in the wrong place.
   MD041: false
 
-  MD013:
+  # The prettier style file drops MD013 on the assumption Prettier reflows
+  # prose, which it only does with proseWrap "always" or "never" — this repo's
+  # .prettierrc keeps "preserve", so the check is still ours and still worth
+  # having. Re-enabled under the alias: `extends` merges on the literal key,
+  # so an `MD013:` block here would sit beside the inherited `line-length:
+  # false` and lose, reading as on while actually off.
+  line-length:
     # Prose stays at 80 so the diff of a reworded paragraph is the paragraph.
     line_length: 80
     # Tables and code blocks are exempt: a pinned image digest and a table row
