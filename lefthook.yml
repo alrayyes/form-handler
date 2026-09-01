@@ -21,11 +21,13 @@ pre-commit:
     # about to overwrite.
     - name: prettier
       glob: "*.{md,yml,yaml}"
+      exclude: ".claude/"
       run: bunx prettier --write {staged_files}
       stage_fixed: true
 
     - name: markdownlint
       glob: "*.md"
+      exclude: ".claude/"
       run: bunx markdownlint-cli2 {staged_files}
 
     # Fast enough for a commit. LTeX is not — around eight seconds a file — so

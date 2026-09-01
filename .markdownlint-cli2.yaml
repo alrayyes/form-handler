@@ -20,6 +20,8 @@ ignores:
   # held to somebody else's rules.
   - "styles/Google/**"
   - "styles/proselint/**"
+  # OpenSpec's own Claude Code skills and commands, vendored by `openspec init`.
+  - ".claude/**"
 
 config:
   # A pull request template has no title of its own — GitHub drops it into a
