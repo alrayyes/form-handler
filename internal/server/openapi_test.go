@@ -112,7 +112,7 @@ func TestTheServiceAnswersAsTheSpecSays(t *testing.T) {
 	documented := loadSpec(t)
 
 	exercised := make(map[responseKey]bool, len(documented))
-	for _, c := range specCases() {
+	for _, c := range specCases {
 		exercised[c.responseKey] = true
 
 		t.Run(c.String(), func(t *testing.T) {
@@ -134,115 +134,116 @@ func TestTheServiceAnswersAsTheSpecSays(t *testing.T) {
 	}
 }
 
-func specCases() []specCase {
-	return []specCase{{
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusAccepted},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+// specCases is the data TestTheServiceAnswersAsTheSpecSays runs, kept out of
+// that function so it reads as "run every case" rather than as one long
+// function funlen has to be told to ignore.
+var specCases = []specCase{{
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusAccepted},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", specBody, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusBadRequest},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", specBody, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusBadRequest},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			body := `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`
+		body := `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`
 
-			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", body, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusForbidden},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", body, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusForbidden},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", specBody, "https://someone-else.example")
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusNotFound},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", specBody, "https://someone-else.example")
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusNotFound},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			mux, _ := serve(t, slog.LevelInfo)
+		mux, _ := serve(t, slog.LevelInfo)
 
-			return specSend(mux, http.MethodPost, "/contact/nosuchform", specBody, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusUnprocessableEntity},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(mux, http.MethodPost, "/contact/nosuchform", specBody, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusUnprocessableEntity},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			body := `{"name":"","email":"ada@example.com","message":"long enough to pass"}`
+		body := `{"name":"","email":"ada@example.com","message":"long enough to pass"}`
 
-			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", body, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusTooManyRequests},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodPost, "/contact", body, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusTooManyRequests},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			h := specForm(t, mailertest.NewFake(), "", 1)
-			require.Equal(t, http.StatusAccepted,
-				specSend(h, http.MethodPost, "/contact", specBody, specOrigin).Code,
-				"the setup never spent the one submission the limit allows")
+		h := specForm(t, mailertest.NewFake(), "", 1)
+		require.Equal(t, http.StatusAccepted,
+			specSend(h, http.MethodPost, "/contact", specBody, specOrigin).Code,
+			"the setup never spent the one submission the limit allows")
 
-			return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusInternalServerError},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusInternalServerError},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			// Parses, so it survives startup, and fails at execution because
-			// .Name is a string with no such field. That is the only way this
-			// service reaches a 500, and it is why the spec can claim one.
-			h := specForm(t, mailertest.NewFake(), "{{ .Name.Missing }}", 100)
+		// Parses, so it survives startup, and fails at execution because
+		// .Name is a string with no such field. That is the only way this
+		// service reaches a 500, and it is why the spec can claim one.
+		h := specForm(t, mailertest.NewFake(), "{{ .Name.Missing }}", 100)
 
-			return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusBadGateway},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodPost, "/contact/{form}", http.StatusBadGateway},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			h := specForm(t, mailertest.NewFake().Breaks(io.ErrUnexpectedEOF), "", 100)
+		h := specForm(t, mailertest.NewFake().Breaks(io.ErrUnexpectedEOF), "", 100)
 
-			return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodOptions, "/contact/{form}", http.StatusNoContent},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(h, http.MethodPost, "/contact", specBody, specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodOptions, "/contact/{form}", http.StatusNoContent},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodOptions, "/contact", "", specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodOptions, "/contact/{form}", http.StatusNotFound},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodOptions, "/contact", "", specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodOptions, "/contact/{form}", http.StatusNotFound},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			mux, _ := serve(t, slog.LevelInfo)
+		mux, _ := serve(t, slog.LevelInfo)
 
-			return specSend(mux, http.MethodOptions, "/contact/nosuchform", "", specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodGet, "/contact/{form}", http.StatusMethodNotAllowed},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(mux, http.MethodOptions, "/contact/nosuchform", "", specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodGet, "/contact/{form}", http.StatusMethodNotAllowed},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodGet, "/contact", "", specOrigin)
-		},
-	}, {
-		responseKey: responseKey{http.MethodGet, "/healthz", http.StatusOK},
-		send: func(t *testing.T) *httptest.ResponseRecorder {
-			t.Helper()
+		return specSend(specForm(t, mailertest.NewFake(), "", 100), http.MethodGet, "/contact", "", specOrigin)
+	},
+}, {
+	responseKey: responseKey{http.MethodGet, "/healthz", http.StatusOK},
+	send: func(t *testing.T) *httptest.ResponseRecorder {
+		t.Helper()
 
-			mux, _ := serve(t, slog.LevelInfo)
+		mux, _ := serve(t, slog.LevelInfo)
 
-			return specSend(mux, http.MethodGet, "/healthz", "", "")
-		},
-	}}
-}
+		return specSend(mux, http.MethodGet, "/healthz", "", "")
+	},
+}}
 
 // The spec templates one path and the service also answers on /contact, so the
 // alias is the one part of the contract the table above cannot reach. Proving

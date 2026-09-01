@@ -89,16 +89,17 @@ forms:
 	assert.Equal(t, "mg.example.com", forms[0].Mailgun.Domain)
 }
 
-func TestMailgunConfigIsRejectedWhenItCannotWork(t *testing.T) {
-	t.Setenv("MAILGUN_KEY", "key-secret")
-
-	cases := map[string]struct {
-		yaml string
-		want string
-	}{
-		// Both is a question about which one wins, and any answer surprises
-		// somebody.
-		"both providers on one form": {`
+// mailgunBadConfigCases is the data for
+// TestMailgunConfigIsRejectedWhenItCannotWork, kept out of the function
+// itself so the test reads as "run every case" rather than as one long
+// function funlen has to be told to ignore.
+var mailgunBadConfigCases = map[string]struct {
+	yaml string
+	want string
+}{
+	// Both is a question about which one wins, and any answer surprises
+	// somebody.
+	"both providers on one form": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -110,7 +111,7 @@ forms:
       domain: mg.example.com
       api_key_env: MAILGUN_KEY
 `, "not both"},
-		"no domain": {`
+	"no domain": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -119,7 +120,7 @@ forms:
     mailgun:
       api_key_env: MAILGUN_KEY
 `, "domain"},
-		"no key at all": {`
+	"no key at all": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -128,9 +129,9 @@ forms:
     mailgun:
       domain: mg.example.com
 `, "api_key"},
-		// Sending to the wrong region fails authentication rather than
-		// redirecting, so a typo here is worth catching at startup.
-		"unknown region": {`
+	// Sending to the wrong region fails authentication rather than
+	// redirecting, so a typo here is worth catching at startup.
+	"unknown region": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -141,7 +142,7 @@ forms:
       region: antarctica
       api_key_env: MAILGUN_KEY
 `, "region"},
-		"both key forms": {`
+	"both key forms": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -152,9 +153,9 @@ forms:
       api_key: inline
       api_key_env: MAILGUN_KEY
 `, "not both"},
-		// Ambiguous rather than wrong: the file says both are available and the
-		// form says nothing, so nobody has decided.
-		"both file defaults and a silent form": {`
+	// Ambiguous rather than wrong: the file says both are available and the
+	// form says nothing, so nobody has decided.
+	"both file defaults and a silent form": {`
 smtp:
   addr: smtp.example.com:587
 mailgun:
@@ -167,9 +168,12 @@ forms:
     from: a@example.com
     to: b@example.com
 `, "must name which"},
-	}
+}
 
-	for name, tc := range cases {
+func TestMailgunConfigIsRejectedWhenItCannotWork(t *testing.T) {
+	t.Setenv("MAILGUN_KEY", "key-secret")
+
+	for name, tc := range mailgunBadConfigCases {
 		t.Run(name, func(t *testing.T) {
 			_, err := parse(t, tc.yaml)
 

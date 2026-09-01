@@ -75,70 +75,7 @@ func TestTheEndpointEnforcesTheRequestSchema(t *testing.T) {
 	})
 
 	for _, field := range sortedKeys(submission.Properties) {
-		prop := submission.Properties[field]
-
-		if prop.MaxLength != nil {
-			t.Run(field+" at its documented maximum is accepted", func(t *testing.T) {
-				body := validSubmission(t, submission)
-				body[field] = valueOfLength(prop, *prop.MaxLength)
-
-				res := submit(t, body)
-
-				require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
-			})
-
-			t.Run(field+" past its documented maximum is refused", func(t *testing.T) {
-				body := validSubmission(t, submission)
-				body[field] = valueOfLength(prop, *prop.MaxLength+1)
-
-				res := submit(t, body)
-
-				assertRefusedField(t, invalid, res, field)
-			})
-		}
-
-		if prop.MinLength != nil && *prop.MinLength > 0 {
-			t.Run(field+" at its documented minimum is accepted", func(t *testing.T) {
-				// A length bound is not the only thing a property can ask for.
-				// email is minLength 1 and format email, and no one-character
-				// string satisfies both — the shortest value that passes is
-				// decided by the format, not the number. Skipped rather than
-				// fudged, and the format gets its own case below.
-				if prop.Format != "" {
-					t.Skipf("%s is also %s, which a value of minimum length cannot satisfy", field, prop.Format)
-				}
-
-				body := validSubmission(t, submission)
-				body[field] = valueOfLength(prop, *prop.MinLength)
-
-				res := submit(t, body)
-
-				require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
-			})
-
-			t.Run(field+" short of its documented minimum is refused", func(t *testing.T) {
-				body := validSubmission(t, submission)
-				body[field] = valueOfLength(prop, *prop.MinLength-1)
-
-				res := submit(t, body)
-
-				assertRefusedField(t, invalid, res, field)
-			})
-		}
-
-		if prop.Format != "" {
-			t.Run(field+" has to satisfy its documented format", func(t *testing.T) {
-				body := validSubmission(t, submission)
-				// Inside every length bound the spec states, and still not an
-				// address. Without this the format is the one keyword in the
-				// schema nothing holds the service to.
-				body[field] = malformed(prop)
-
-				res := submit(t, body)
-
-				assertRefusedField(t, invalid, res, field)
-			})
-		}
+		testFieldBounds(t, submission, invalid, field, submission.Properties[field])
 	}
 
 	for _, field := range submission.Required {
@@ -166,6 +103,75 @@ func TestTheEndpointEnforcesTheRequestSchema(t *testing.T) {
 		// is a submission to find fault with.
 		require.Equal(t, http.StatusBadRequest, res.Code, res.Body.String())
 	})
+}
+
+// testFieldBounds checks one property against every bound the spec states for
+// it: length maxima and minima, and format.
+func testFieldBounds(t *testing.T, submission, invalid specSchema, field string, prop specSchema) {
+	t.Helper()
+
+	if prop.MaxLength != nil {
+		t.Run(field+" at its documented maximum is accepted", func(t *testing.T) {
+			body := validSubmission(t, submission)
+			body[field] = valueOfLength(prop, *prop.MaxLength)
+
+			res := submit(t, body)
+
+			require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
+		})
+
+		t.Run(field+" past its documented maximum is refused", func(t *testing.T) {
+			body := validSubmission(t, submission)
+			body[field] = valueOfLength(prop, *prop.MaxLength+1)
+
+			res := submit(t, body)
+
+			assertRefusedField(t, invalid, res, field)
+		})
+	}
+
+	if prop.MinLength != nil && *prop.MinLength > 0 {
+		t.Run(field+" at its documented minimum is accepted", func(t *testing.T) {
+			// A length bound is not the only thing a property can ask for.
+			// email is minLength 1 and format email, and no one-character
+			// string satisfies both — the shortest value that passes is
+			// decided by the format, not the number. Skipped rather than
+			// fudged, and the format gets its own case below.
+			if prop.Format != "" {
+				t.Skipf("%s is also %s, which a value of minimum length cannot satisfy", field, prop.Format)
+			}
+
+			body := validSubmission(t, submission)
+			body[field] = valueOfLength(prop, *prop.MinLength)
+
+			res := submit(t, body)
+
+			require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
+		})
+
+		t.Run(field+" short of its documented minimum is refused", func(t *testing.T) {
+			body := validSubmission(t, submission)
+			body[field] = valueOfLength(prop, *prop.MinLength-1)
+
+			res := submit(t, body)
+
+			assertRefusedField(t, invalid, res, field)
+		})
+	}
+
+	if prop.Format != "" {
+		t.Run(field+" has to satisfy its documented format", func(t *testing.T) {
+			body := validSubmission(t, submission)
+			// Inside every length bound the spec states, and still not an
+			// address. Without this the format is the one keyword in the
+			// schema nothing holds the service to.
+			body[field] = malformed(prop)
+
+			res := submit(t, body)
+
+			assertRefusedField(t, invalid, res, field)
+		})
+	}
 }
 
 // assertRefusedField checks a refusal against what the spec says a refusal

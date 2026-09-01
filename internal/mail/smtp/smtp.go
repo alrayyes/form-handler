@@ -67,6 +67,12 @@ func (s Sender) Send(ctx context.Context, m contact.Message) error {
 	}
 	defer func() { _ = client.Close() }()
 
+	return s.deliver(client, host, m)
+}
+
+// deliver runs the SMTP conversation once the connection and handshake are
+// up: STARTTLS where offered, auth where configured, then the message.
+func (s Sender) deliver(client *netsmtp.Client, host string, m contact.Message) error {
 	// STARTTLS when the server offers it. Not required, because this may talk to
 	// a bridge on localhost where there is nothing between the two processes to
 	// listen in on; refusing plaintext there would mean no mail at all.
