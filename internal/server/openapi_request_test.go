@@ -11,11 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-
-	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 )
 
 // The request half of the same job openapi_test.go does for responses.
@@ -205,6 +204,7 @@ func valueOfLength(prop specSchema, n int) string {
 		// lengths: the service should refuse it either way.
 		return strings.Repeat("a", n)
 	}
+
 	return strings.Repeat("a", n-len(domain)) + domain
 }
 
@@ -241,6 +241,7 @@ func validSubmission(t *testing.T, submission specSchema) map[string]any {
 			body[field] = ""
 		}
 	}
+
 	return body
 }
 
@@ -262,6 +263,7 @@ func loadRequestDoc(t *testing.T) requestDoc {
 
 	var doc requestDoc
 	require.NoError(t, yaml.Unmarshal(raw, &doc))
+
 	return doc
 }
 
@@ -299,6 +301,7 @@ func resolveSchema(t *testing.T, doc requestDoc, s specSchema) specSchema {
 
 	out, ok := doc.Components.Schemas[strings.TrimPrefix(s.Ref, prefix)]
 	require.Truef(t, ok, "%s does not resolve", s.Ref)
+
 	return out
 }
 
@@ -311,5 +314,6 @@ func sortedKeys(m map[string]specSchema) []string {
 		out = append(out, k)
 	}
 	slices.Sort(out)
+
 	return out
 }

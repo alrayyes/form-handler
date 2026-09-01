@@ -4,12 +4,25 @@ linters:
   default: standard
   enable:
     - bodyclose
+    - dupl
     - errorlint
+    - gocritic
     - gosec
+    - makezero
     - misspell
+    - modernize
+    - nlreturn
     - revive
+    - sqlclosecheck
+    - thelper
     - unconvert
+    - unparam
+    - usestdlibvars
+    - whitespace
   settings:
+    gocritic:
+      enabled-checks:
+        - emptyStringTest
     gosec:
       excludes:
         # The SMTP address comes from configuration this service owns, not from
@@ -20,8 +33,10 @@ linters:
       - path: _test\.go
         linters:
           - gosec
+          - dupl
 
 formatters:
   enable:
-    - gofmt
+    - gci
+    - gofumpt
     - goimports

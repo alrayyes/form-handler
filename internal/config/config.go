@@ -16,9 +16,8 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/alrayyes/form-handler/internal/contact"
+	"gopkg.in/yaml.v3"
 )
 
 // Defaults for the settings a form may leave out.
@@ -107,7 +106,7 @@ func Load() (Config, error) {
 	cfg.LogLevel = level
 
 	if raw := os.Getenv("TRUSTED_PROXIES"); strings.TrimSpace(raw) != "" {
-		for _, p := range strings.Split(raw, ",") {
+		for p := range strings.SplitSeq(raw, ",") {
 			if p = strings.TrimSpace(p); p != "" {
 				cfg.TrustedProxies = append(cfg.TrustedProxies, p)
 			}
@@ -120,6 +119,7 @@ func Load() (Config, error) {
 			return Config{}, err
 		}
 		cfg.Forms = forms
+
 		return cfg, nil
 	}
 
@@ -128,6 +128,7 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	cfg.Forms = []Form{form}
+
 	return cfg, nil
 }
 
@@ -163,7 +164,7 @@ func formFromEnv() (Form, error) {
 	if strings.TrimSpace(origins) == "" {
 		return Form{}, errors.New("ALLOWED_ORIGINS is required when FORMS_FILE is not set")
 	}
-	for _, o := range strings.Split(origins, ",") {
+	for o := range strings.SplitSeq(origins, ",") {
 		if o = strings.TrimSpace(o); o != "" {
 			form.Origins = append(form.Origins, o)
 		}
@@ -181,6 +182,7 @@ func formFromEnv() (Form, error) {
 	if err := validate([]Form{form}); err != nil {
 		return Form{}, err
 	}
+
 	return form, nil
 }
 
@@ -196,6 +198,7 @@ func LoadForms(path string) ([]Form, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+
 	return forms, nil
 }
 
@@ -351,6 +354,7 @@ func ParseForms(r io.Reader) ([]Form, error) {
 	if err := validate(forms); err != nil {
 		return nil, err
 	}
+
 	return forms, nil
 }
 
@@ -431,10 +435,12 @@ func resolveProvider(file *yamlFile, form yamlForm, where string) (*SMTP, *Mailg
 
 	case form.Mailgun != nil:
 		mg, err := resolveMailgun(file.Mailgun, form.Mailgun, where)
+
 		return nil, mg, err
 
 	case form.SMTP != nil:
 		smtp, err := resolveSMTP(file.SMTP, form.SMTP, where)
+
 		return smtp, nil, err
 
 	// Neither named on the form: inherit the file's defaults, so a deployment
@@ -448,10 +454,12 @@ func resolveProvider(file *yamlFile, form yamlForm, where string) (*SMTP, *Mailg
 
 	case file.Mailgun != nil:
 		mg, err := resolveMailgun(file.Mailgun, nil, where)
+
 		return nil, mg, err
 
 	default:
 		smtp, err := resolveSMTP(file.SMTP, nil, where)
+
 		return smtp, nil, err
 	}
 }
@@ -520,6 +528,7 @@ func validOrigin(o string) error {
 	case u.Path != "" || u.RawQuery != "" || u.Fragment != "":
 		return errors.New("must be scheme://host[:port] with nothing after it")
 	}
+
 	return nil
 }
 
@@ -527,6 +536,7 @@ func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
+
 	return fallback
 }
 
@@ -536,6 +546,7 @@ func describe(index int, id string) string {
 	if id != "" {
 		return fmt.Sprintf("%q", id)
 	}
+
 	return fmt.Sprintf("#%d", index)
 }
 

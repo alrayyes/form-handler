@@ -7,11 +7,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/alrayyes/form-handler/internal/contact/mailertest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The fake is held to the same contract as the two real adapters. Without this

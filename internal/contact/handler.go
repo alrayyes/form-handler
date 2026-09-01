@@ -84,6 +84,7 @@ func (h *Handler) subjectFor(m Message) (string, error) {
 	if err := h.subject.Execute(&b, subjectData{Name: m.Name, Email: m.Email, Form: h.form.ID}); err != nil {
 		return "", fmt.Errorf("render subject: %w", err)
 	}
+
 	return stripBreaks(b.String()), nil
 }
 
@@ -105,12 +106,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 		w.WriteHeader(http.StatusNoContent)
+
 		return
 	}
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST, OPTIONS")
 		h.refuse(w, r, http.StatusMethodNotAllowed, errorBody{Error: "method not allowed"}, "method", r.Method)
+
 		return
 	}
 
@@ -123,11 +126,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// is not "everybody is".
 	if !h.origins[origin] {
 		h.refuse(w, r, http.StatusForbidden, errorBody{Error: "origin not allowed"})
+
 		return
 	}
 
 	if !h.limiter.Allow(h.clientIP.From(r)) {
 		h.refuse(w, r, http.StatusTooManyRequests, errorBody{Error: "too many submissions, try later"})
+
 		return
 	}
 
@@ -141,6 +146,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// one, which is the difference between "their form is out of date" and
 		// "somebody is poking at this".
 		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "could not read submission"}, "detail", logsafe.String(err.Error()))
+
 		return
 	}
 
@@ -157,11 +163,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Info("dropped submission", "form", h.form.ID, "status", http.StatusAccepted,
 			"reason", "honeypot", "ip", h.clientIP.From(r), "origin", logsafe.String(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
+
 		return
 	case ValidationError:
 		h.refuse(w, r, http.StatusUnprocessableEntity, errorBody{
 			Error: "invalid submission", Field: rejected.Field, Reason: rejected.Reason,
 		}, "field", rejected.Field, "why", rejected.Reason)
+
 		return
 	}
 
@@ -170,6 +178,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Error("could not build subject", "form", h.form.ID,
 			"status", http.StatusInternalServerError, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody{Error: "could not send message"})
+
 		return
 	}
 	msg.Subject = subject
@@ -180,6 +189,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Error("could not send message", "form", h.form.ID,
 			"status", http.StatusBadGateway, "error", err)
 		writeJSON(w, http.StatusBadGateway, errorBody{Error: "could not send message"})
+
 		return
 	}
 

@@ -22,10 +22,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/server"
+	"github.com/spf13/cobra"
 )
 
 // Run parses args and does what they ask, returning the process exit code.
@@ -43,8 +42,10 @@ func Run(version string, args []string, stdout, stderr io.Writer) int {
 	if err := cmd.Execute(); err != nil {
 		// Nothing useful to do if even stderr will not take it.
 		_, _ = fmt.Fprintln(stderr, "error:", err)
+
 		return 1
 	}
+
 	return 0
 }
 
@@ -76,6 +77,7 @@ func legacySingleDash(args []string) []string {
 			out[i] = "-" + arg
 		}
 	}
+
 	return out
 }
 
@@ -104,6 +106,7 @@ func newRootCommand(version string, stdout io.Writer) *cobra.Command {
 			if healthcheck {
 				return probe()
 			}
+
 			return run(version, stdout)
 		},
 	}
@@ -144,6 +147,7 @@ func probe() error {
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("status %d", res.StatusCode)
 	}
+
 	return nil
 }
 
@@ -199,6 +203,7 @@ func run(version string, stdout io.Writer) error {
 		// that a deploy is not held up by one.
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
+
 		return srv.Shutdown(shutdownCtx)
 	}
 }

@@ -15,9 +15,8 @@ import (
 	"strings"
 	"time"
 
-	mg "github.com/mailgun/mailgun-go/v5"
-
 	"github.com/alrayyes/form-handler/internal/contact"
+	mg "github.com/mailgun/mailgun-go/v5"
 )
 
 // provider names this adapter in a DeliveryError.
@@ -82,6 +81,7 @@ func New(cfg Config) (*Sender, error) {
 	for _, addr := range []struct{ field, value string }{{"from", cfg.From}, {"to", cfg.To}} {
 		if strings.TrimSpace(addr.value) == "" {
 			problems = append(problems, addr.field+" is required")
+
 			continue
 		}
 		if _, err := mail.ParseAddress(addr.value); err != nil {
@@ -143,8 +143,10 @@ func (s *Sender) Send(ctx context.Context, m contact.Message) error {
 		if errors.Is(err, context.DeadlineExceeded) {
 			op = "timeout"
 		}
+
 		return contact.Undeliverable(provider, op, err)
 	}
+
 	return nil
 }
 
@@ -156,5 +158,6 @@ func body(m contact.Message) string {
 	b.WriteString("Email: " + m.Email + "\n\n")
 	b.WriteString(m.Body)
 	b.WriteString("\n")
+
 	return b.String()
 }

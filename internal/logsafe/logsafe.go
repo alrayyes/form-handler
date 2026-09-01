@@ -57,6 +57,7 @@ func String(v string) string {
 		if r == utf8.RuneError || unicode.IsControl(r) {
 			return -1
 		}
+
 		return r
 	}, v)
 
@@ -74,5 +75,6 @@ func String(v string) string {
 		b.WriteRune(r)
 	}
 	b.WriteString(truncated)
+
 	return b.String()
 }

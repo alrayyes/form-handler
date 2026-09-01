@@ -60,11 +60,13 @@ func (m *Memory) Allow(key string) bool {
 	w, ok := m.seen[key]
 	if !ok || now.After(w.reset) {
 		m.seen[key] = &window{count: 1, reset: now.Add(m.period)}
+
 		return true
 	}
 	if w.count >= m.limit {
 		return false
 	}
 	w.count++
+
 	return true
 }

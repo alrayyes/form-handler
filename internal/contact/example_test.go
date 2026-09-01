@@ -23,6 +23,7 @@ func ExampleValidate() {
 	})
 	if err != nil {
 		fmt.Println("rejected:", err)
+
 		return
 	}
 

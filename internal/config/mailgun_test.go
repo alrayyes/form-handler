@@ -6,10 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alrayyes/form-handler/internal/config"
 )
 
 func TestAFormCanSendThroughMailgun(t *testing.T) {

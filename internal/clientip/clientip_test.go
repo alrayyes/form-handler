@@ -7,10 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alrayyes/form-handler/internal/clientip"
 )
 
 func request(t *testing.T, remoteAddr, xff string) *http.Request {
@@ -20,6 +19,7 @@ func request(t *testing.T, remoteAddr, xff string) *http.Request {
 	if xff != "" {
 		r.Header.Set("X-Forwarded-For", xff)
 	}
+
 	return r
 }
 
@@ -27,6 +27,7 @@ func resolver(t *testing.T, trusted ...string) clientip.Resolver {
 	t.Helper()
 	r, err := clientip.NewResolver(trusted)
 	require.NoError(t, err)
+
 	return r
 }
 

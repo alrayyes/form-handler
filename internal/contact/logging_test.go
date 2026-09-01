@@ -12,13 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/ratelimit"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // logged is one line of the service's JSON log, decoded.
@@ -38,7 +37,7 @@ func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
 
 	return h, func() []logged {
 		var out []logged
-		for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(buf.String()), "\n") {
 			if line == "" {
 				continue
 			}
@@ -46,6 +45,7 @@ func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
 			require.NoError(t, json.Unmarshal([]byte(line), &entry), "log line is not JSON: %s", line)
 			out = append(out, entry)
 		}
+
 		return out
 	}
 }
