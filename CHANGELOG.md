@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.3](https://github.com/alrayyes/form-handler/compare/v2.2.2...v2.2.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* **lint:** enable and satisfy golangci-lint's mechanical linters ([#82](https://github.com/alrayyes/form-handler/issues/82)) ([710c0d3](https://github.com/alrayyes/form-handler/commit/710c0d3b562eb6fbc223ff5ee4692c73c69963c7))
+* **lint:** satisfy err113 with wrapped sentinel errors ([#84](https://github.com/alrayyes/form-handler/issues/84)) ([1892d3d](https://github.com/alrayyes/form-handler/commit/1892d3d2c7e67e16a7794b01f23cfbbb22931925))
+* **lint:** satisfy wrapcheck by wrapping or naming why not ([#85](https://github.com/alrayyes/form-handler/issues/85)) ([397e8db](https://github.com/alrayyes/form-handler/commit/397e8dbbaf72ade327e24cf5e0b6272917e8b88e))
+
 ## [2.2.2](https://github.com/alrayyes/form-handler/compare/v2.2.1...v2.2.2) (2026-09-01)
 
 
