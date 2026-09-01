@@ -144,7 +144,7 @@ func probe() error {
 	// this service's own ADDR rather than from anything a request carries.
 	res, err := client.Get("http://127.0.0.1:" + port + "/healthz") //nolint:gosec // G704: loopback only, port from own config
 	if err != nil {
-		return err
+		return fmt.Errorf("healthcheck: %w", err)
 	}
 	defer func() { _ = res.Body.Close() }()
 
@@ -161,14 +161,14 @@ func run(version string, stdout io.Writer) error {
 	// logged, which is the one thing that cannot wait for this ordering.
 	cfg, err := config.Load()
 	if err != nil {
-		return err
+		return fmt.Errorf("config: %w", err)
 	}
 
 	log := slog.New(slog.NewJSONHandler(stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 
 	handler, err := server.New(cfg, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("server: %w", err)
 	}
 
 	srv := &http.Server{
@@ -208,6 +208,10 @@ func run(version string, stdout io.Writer) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		return srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown: %w", err)
+		}
+
+		return nil
 	}
 }

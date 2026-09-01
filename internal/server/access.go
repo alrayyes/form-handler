@@ -31,7 +31,7 @@ func (r *recorder) Write(b []byte) (int, error) {
 		r.status = http.StatusOK
 	}
 
-	return r.ResponseWriter.Write(b)
+	return r.ResponseWriter.Write(b) //nolint:wrapcheck // recorder implements io.Writer itself; wrapping would change what a caller checking this error sees
 }
 
 // logRequests logs every request the service answers.

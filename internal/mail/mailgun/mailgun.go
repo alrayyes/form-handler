@@ -153,7 +153,7 @@ func (s *Sender) Send(ctx context.Context, m contact.Message) error {
 			op = "timeout"
 		}
 
-		return contact.Undeliverable(provider, op, err)
+		return contact.Undeliverable(provider, op, err) //nolint:wrapcheck // Undeliverable already wraps err in a *DeliveryError
 	}
 
 	return nil

@@ -16,7 +16,7 @@ import (
 func parse(t *testing.T, yaml string) ([]config.Form, error) {
 	t.Helper()
 
-	return config.ParseForms(strings.NewReader(yaml))
+	return config.ParseForms(strings.NewReader(yaml)) //nolint:wrapcheck // test helper, the SUT's own error is what the test asserts on
 }
 
 const twoForms = `
