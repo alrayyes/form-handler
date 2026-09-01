@@ -46,9 +46,10 @@ if [ -z "$jdk" ]; then
 fi
 export JAVA_HOME="$jdk"
 
-# CODE_OF_CONDUCT.md is the Contributor Covenant verbatim and CHANGELOG.md is
-# written by the release job; correcting either is not this script's business.
-files=$(git ls-files '*.md' | grep -v '^CODE_OF_CONDUCT.md$' | grep -v '^CHANGELOG.md$')
+# CODE_OF_CONDUCT.md is the Contributor Covenant verbatim, CHANGELOG.md is
+# written by the release job, and .claude/ is OpenSpec's own vendored docs;
+# correcting any of them is not this script's business.
+files=$(git ls-files '*.md' | grep -v '^CODE_OF_CONDUCT.md$' | grep -v '^CHANGELOG.md$' | grep -v '^\.claude/')
 
 echo "Checking:"
 echo "$files"
