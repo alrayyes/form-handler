@@ -20,6 +20,7 @@ linters:
     - unparam
     - usestdlibvars
     - whitespace
+    - wrapcheck
   settings:
     gocritic:
       enabled-checks:
@@ -29,6 +30,12 @@ linters:
         # The SMTP address comes from configuration this service owns, not from
         # a request, and the bridge it talks to may legitimately be plaintext.
         - G402
+    wrapcheck:
+      extra-ignore-sigs:
+        # contact.Undeliverable already wraps err in a *DeliveryError with its
+        # own Unwrap, same reason wrapcheck's own defaults skip errors.New(
+        # and .Errorf( — this is this project's version of the same thing.
+        - .Undeliverable(
   exclusions:
     rules:
       - path: _test\.go

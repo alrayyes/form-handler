@@ -41,7 +41,7 @@ func New(cfg config.Config, log *slog.Logger) (http.Handler, error) {
 	// property of the deployment, not of a form.
 	resolver, err := clientip.NewResolver(cfg.TrustedProxies)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}
 
 	for _, f := range cfg.Forms {
@@ -124,7 +124,7 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 func mailerFor(f config.Form) (contact.Mailer, error) {
 	switch {
 	case f.Mailgun != nil:
-		return mailgun.New(mailgun.Config{
+		sender, err := mailgun.New(mailgun.Config{
 			Domain:  f.Mailgun.Domain,
 			APIKey:  f.Mailgun.APIKey,
 			Region:  f.Mailgun.Region,
@@ -133,6 +133,11 @@ func mailerFor(f config.Form) (contact.Mailer, error) {
 			To:      f.To,
 			Timeout: f.Mailgun.Timeout,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("form %q: %w", f.ID, err)
+		}
+
+		return sender, nil
 
 	case f.SMTP != nil:
 		return smtp.Sender{
