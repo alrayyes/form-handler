@@ -95,6 +95,9 @@ pre-push:
     - name: test
       run: go test ./...
 
+    - name: govulncheck
+      run: go tool govulncheck ./...
+
     # These are `package.json` scripts rather than the commands spelled out,
     # because CI runs the same ones and a literal copied into two files drifts
     # the first time somebody edits one of them.

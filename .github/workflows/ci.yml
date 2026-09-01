@@ -43,6 +43,11 @@ jobs:
         # golangci-lint's formatter reports rather than rewrites here; this is
         # the check that a file was committed unformatted.
         run: gofmt -l . | (! grep .)
+      - name: govulncheck
+        # Pinning stops a version drifting; it says nothing about the pinned
+        # version already having a known CVE. This catches that separately
+        # from whatever raised the dependency-bump PR in the first place.
+        run: go tool govulncheck ./...
 
   test:
     runs-on: ubuntu-24.04
