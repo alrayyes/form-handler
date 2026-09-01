@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.4](https://github.com/alrayyes/form-handler/compare/v2.2.3...v2.2.4) (2026-09-01)
+
+
+### Bug Fixes
+
+* **lint:** satisfy testifylint with enable-all ([#86](https://github.com/alrayyes/form-handler/issues/86)) ([20058a7](https://github.com/alrayyes/form-handler/commit/20058a71115d0c0411d9b0ea1c2ae8b49a021ab6))
+
 ## [2.2.3](https://github.com/alrayyes/form-handler/compare/v2.2.2...v2.2.3) (2026-09-01)
 
 
