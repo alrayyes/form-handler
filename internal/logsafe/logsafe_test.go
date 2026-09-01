@@ -6,10 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alrayyes/form-handler/internal/logsafe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alrayyes/form-handler/internal/logsafe"
 )
 
 func TestOrdinaryValuesArePassedThrough(t *testing.T) {
@@ -61,7 +60,7 @@ func TestLongValuesAreTruncated(t *testing.T) {
 func TestTruncationDoesNotSplitARune(t *testing.T) {
 	got := logsafe.String(strings.Repeat("é", logsafe.Max*2))
 
-	require.True(t, len(got) > 0)
+	require.NotEmpty(t, got)
 	assert.True(t, strings.ContainsRune(got, 'é'))
 	for _, r := range got {
 		assert.NotEqual(t, '�', r, "truncation produced an invalid rune")

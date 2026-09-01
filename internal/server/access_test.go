@@ -12,11 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/server"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type entry map[string]any
@@ -43,7 +42,7 @@ func serve(t *testing.T, level slog.Level) (http.Handler, func() []entry) {
 
 	return h, func() []entry {
 		var out []entry
-		for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(buf.String()), "\n") {
 			if line == "" {
 				continue
 			}
@@ -51,6 +50,7 @@ func serve(t *testing.T, level slog.Level) (http.Handler, func() []entry) {
 			require.NoError(t, json.Unmarshal([]byte(line), &e), "not JSON: %s", line)
 			out = append(out, e)
 		}
+
 		return out
 	}
 }
@@ -60,6 +60,7 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
+
 	return res
 }
 

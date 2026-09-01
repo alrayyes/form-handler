@@ -186,6 +186,7 @@ func stripBreaks(v string) string {
 		if r == '\r' || r == '\n' {
 			return -1
 		}
+
 		return r
 	}, v)
 }

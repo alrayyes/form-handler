@@ -30,6 +30,7 @@ func (r *recorder) Write(b []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
 	}
+
 	return r.ResponseWriter.Write(b)
 }
 

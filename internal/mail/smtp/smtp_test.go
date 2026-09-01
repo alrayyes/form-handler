@@ -23,12 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/mail/smtp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // refuseAt names the step a stub turns the message away at. Empty accepts the
@@ -77,12 +76,14 @@ type received struct {
 func (r *received) Body() string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	return r.body.String()
 }
 
 func (r *received) Envelope() (from, to string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	return r.from, r.to
 }
 
@@ -115,6 +116,7 @@ func converse(conn net.Conn, refuse refuseAt, got *received) {
 		case "RCPT":
 			if refuse == refuseRecipient {
 				say("550 no mailbox by that name")
+
 				continue
 			}
 			got.mu.Lock()
@@ -138,6 +140,7 @@ func converse(conn net.Conn, refuse refuseAt, got *received) {
 			say("250 OK")
 		case "QUIT":
 			say("221 bye")
+
 			return
 		default:
 			say("500 unrecognised")
@@ -160,11 +163,17 @@ func TestTheSenderKeepsTheMailerContract(t *testing.T) {
 	mailertest.Contract(t, mailertest.Subject{
 		Provider: "smtp",
 		Working: func(t *testing.T) contact.Mailer {
+			t.Helper()
+
 			addr, _ := stubSMTP(t, acceptEverything)
+
 			return sender(addr)
 		},
 		Failing: func(t *testing.T) contact.Mailer {
+			t.Helper()
+
 			addr, _ := stubSMTP(t, refuseRecipient)
+
 			return sender(addr)
 		},
 	})

@@ -36,5 +36,6 @@ func Undeliverable(provider, op string, err error) error {
 	if err == nil {
 		return nil
 	}
+
 	return &DeliveryError{Provider: provider, Op: op, Err: err}
 }

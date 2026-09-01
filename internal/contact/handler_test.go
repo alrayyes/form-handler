@@ -11,13 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/clientip"
 	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/ratelimit"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const origin = "https://www.example.com"
@@ -31,6 +30,7 @@ func post(t *testing.T, h http.Handler, body, org string) *httptest.ResponseReco
 	}
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
+
 	return res
 }
 
@@ -43,6 +43,7 @@ func newHandler(t *testing.T, m contact.Mailer, perHour int) *contact.Handler {
 		Origins: []string{origin},
 	}, m, ratelimit.New(perHour, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
 	require.NoError(t, err)
+
 	return h
 }
 
@@ -258,6 +259,7 @@ func postAs(t *testing.T, h http.Handler, claimed string) *httptest.ResponseReco
 	req.RemoteAddr = "192.0.2.10:44321"
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
+
 	return res
 }
 

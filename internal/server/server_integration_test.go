@@ -23,13 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alrayyes/form-handler/internal/config"
+	"github.com/alrayyes/form-handler/internal/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-
-	"github.com/alrayyes/form-handler/internal/config"
-	"github.com/alrayyes/form-handler/internal/server"
 )
 
 // Pinned by digest, like every other image this repo pulls. A tag can be moved
@@ -225,6 +224,7 @@ func start(t *testing.T, cfg config.Config) *httptest.Server {
 	require.NoError(t, err, "build the server")
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
+
 	return srv
 }
 
@@ -272,6 +272,7 @@ func startMailpit(ctx context.Context, t *testing.T, instance int) (smtpAddr, ap
 		// test gets its own. Empty it first, or a test counts the message the
 		// previous one sent and reports a leak that isn't.
 		deleteAllMessages(ctx, t, api)
+
 		return addr, api
 	}
 
@@ -331,10 +332,12 @@ func waitForMessageTo(ctx context.Context, t *testing.T, apiURL, recipient strin
 			for _, to := range msg.To {
 				if to.Address == recipient {
 					found = msg
+
 					return true
 				}
 			}
 		}
+
 		return false
 	}, 20*time.Second, 250*time.Millisecond, "no message arrived for %s", recipient)
 
@@ -347,6 +350,7 @@ func messageCount(ctx context.Context, t *testing.T, apiURL string) int {
 		Total int `json:"total"`
 	}
 	getJSON(ctx, t, apiURL+"/api/v1/messages", &list)
+
 	return list.Total
 }
 

@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 )
 
@@ -55,6 +56,7 @@ func NewResolver(trusted []string) (Resolver, error) {
 				return Resolver{}, fmt.Errorf("trusted proxy %q: %w", raw, err)
 			}
 			prefixes = append(prefixes, p.Masked())
+
 			continue
 		}
 
@@ -92,8 +94,8 @@ func (r Resolver) From(req *http.Request) string {
 	// Right to left: skip the hops we recognise as our own and stop at the
 	// first one we do not.
 	hops := strings.Split(xff, ",")
-	for i := len(hops) - 1; i >= 0; i-- {
-		addr, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+	for _, hop := range slices.Backward(hops) {
+		addr, err := netip.ParseAddr(strings.TrimSpace(hop))
 		if err != nil {
 			// An entry that will not parse is not an address we can hold
 			// anyone to, and everything left of it is behind it in a chain we
@@ -103,6 +105,7 @@ func (r Resolver) From(req *http.Request) string {
 		if r.isTrusted(addr) {
 			continue
 		}
+
 		return addr.Unmap().String()
 	}
 
@@ -118,6 +121,7 @@ func (r Resolver) isTrusted(addr netip.Addr) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -131,6 +135,7 @@ func parse(remoteAddr string) netip.Addr {
 	if err != nil {
 		return netip.Addr{}
 	}
+
 	return addr.Unmap()
 }
 
@@ -138,5 +143,6 @@ func stringOrUnknown(addr netip.Addr) string {
 	if !addr.IsValid() {
 		return Unknown
 	}
+
 	return addr.String()
 }

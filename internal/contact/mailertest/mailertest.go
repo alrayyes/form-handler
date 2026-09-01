@@ -22,10 +22,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alrayyes/form-handler/internal/contact"
 )
 
 // Subject is one implementation, and the two states the contract needs it in.

@@ -121,6 +121,7 @@ func formHandlerImage(ctx context.Context, t *testing.T) string {
 
 	image := strings.TrimSpace(string(out))
 	require.NotEmpty(t, image, "ko build printed no image reference")
+
 	return image
 }
 
@@ -130,6 +131,7 @@ func startNetwork(ctx context.Context, t *testing.T) *testcontainers.DockerNetwo
 	nw, err := network.New(ctx)
 	require.NoError(t, err, "create network")
 	t.Cleanup(func() { _ = nw.Remove(ctx) })
+
 	return nw
 }
 
@@ -214,6 +216,7 @@ func post(ctx context.Context, t *testing.T, url, origin, body string) int {
 	res, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = res.Body.Close() }()
+
 	return res.StatusCode
 }
 
@@ -242,8 +245,10 @@ func waitForMessageTo(ctx context.Context, t *testing.T, apiURL, recipient strin
 			var msg mailpitMessage
 			getJSON(ctx, t, apiURL+"/api/v1/message/"+m.ID, &msg)
 			found = msg
+
 			return true
 		}
+
 		return false
 	}, 20*time.Second, 250*time.Millisecond, "no message arrived for %s", recipient)
 

@@ -27,14 +27,12 @@ import (
 	"testing"
 	"time"
 
-	mg "github.com/mailgun/mailgun-go/v5"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/contact"
 	"github.com/alrayyes/form-handler/internal/contact/mailertest"
 	"github.com/alrayyes/form-handler/internal/mail/mailgun"
+	mg "github.com/mailgun/mailgun-go/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // capture is what the fake API saw, so the assertions read as "Mailgun was
@@ -87,11 +85,17 @@ func TestTheSenderKeepsTheMailerContract(t *testing.T) {
 	mailertest.Contract(t, mailertest.Subject{
 		Provider: "mailgun",
 		Working: func(t *testing.T) contact.Mailer {
+			t.Helper()
+
 			baseURL, _ := stubMailgun(t, http.StatusOK, accepted)
+
 			return mustSender(t, baseURL)
 		},
 		Failing: func(t *testing.T) contact.Mailer {
+			t.Helper()
+
 			baseURL, _ := stubMailgun(t, http.StatusUnauthorized, refused)
+
 			return mustSender(t, baseURL)
 		},
 	})
@@ -217,5 +221,6 @@ func mustSender(t *testing.T, baseURL string) *mailgun.Sender {
 		To:      "info@example.com",
 	})
 	require.NoError(t, err)
+
 	return s
 }

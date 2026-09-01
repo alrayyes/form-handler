@@ -39,6 +39,7 @@ func (f *Fake) Breaks(cause error) *Fake {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cause = cause
+
 	return f
 }
 
@@ -58,6 +59,7 @@ func (f *Fake) Send(ctx context.Context, m contact.Message) error {
 	}
 
 	f.sent = append(f.sent, m)
+
 	return nil
 }
 
@@ -69,6 +71,7 @@ func (f *Fake) Sent() []contact.Message {
 
 	out := make([]contact.Message, len(f.sent))
 	copy(out, f.sent)
+
 	return out
 }
 
@@ -76,5 +79,6 @@ func (f *Fake) Sent() []contact.Message {
 func (f *Fake) Count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
 	return len(f.sent)
 }

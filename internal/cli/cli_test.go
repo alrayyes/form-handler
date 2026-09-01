@@ -11,10 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alrayyes/form-handler/internal/cli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alrayyes/form-handler/internal/cli"
 )
 
 // version is what the build stamps into the binary. Handed in by the test
@@ -29,6 +28,7 @@ func run(t *testing.T, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
 	code = cli.Run(version, args, &out, &errOut)
+
 	return code, out.String(), errOut.String()
 }
 
@@ -126,6 +126,7 @@ func unreachableAddr(t *testing.T) string {
 	addr, ok := l.Addr().(*net.TCPAddr)
 	require.True(t, ok)
 	require.NoError(t, l.Close())
+
 	return ":" + strconv.Itoa(addr.Port)
 }
 
@@ -133,5 +134,6 @@ func portOf(t *testing.T, rawURL string) string {
 	t.Helper()
 	_, port, found := strings.Cut(strings.TrimPrefix(rawURL, "http://"), ":")
 	require.True(t, found, "no port in %s", rawURL)
+
 	return port
 }

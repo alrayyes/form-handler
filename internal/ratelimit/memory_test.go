@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alrayyes/form-handler/internal/ratelimit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
 
 const caller = "203.0.113.7"

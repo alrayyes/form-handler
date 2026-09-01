@@ -7,15 +7,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alrayyes/form-handler/internal/config"
 	"github.com/alrayyes/form-handler/internal/contact"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func parse(t *testing.T, yaml string) ([]config.Form, error) {
 	t.Helper()
+
 	return config.ParseForms(strings.NewReader(yaml))
 }
 
@@ -356,5 +356,6 @@ func writeTemp(t *testing.T, contents string) string {
 	t.Helper()
 	path := t.TempDir() + "/forms.yaml"
 	require.NoError(t, os.WriteFile(path, []byte(contents), 0o600))
+
 	return path
 }
