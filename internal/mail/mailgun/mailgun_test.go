@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build integration
-
-// The outer test for the Mailgun adapter.
+// The Mailgun adapter's own tests.
 //
-// Every other integration test in this repository drives a real server in a
-// container, because a real one exists: Mailpit speaks SMTP, so the SMTP
-// adapter is tested against the actual protocol. Mailgun is a hosted HTTP API
-// and has no runnable equivalent. The options are the live API — real mail,
-// real money, real credentials in CI — or something standing in for it, and
-// anything standing in for it is code written here whether it runs in a
-// container or in this process. A container would add a hop without adding a
-// single byte of fidelity.
+// The SMTP adapter's tests run against Mailpit, a real server in a container,
+// because a real one exists to run. Mailgun is a hosted HTTP API with no
+// runnable equivalent: the options are the live API — real mail, real money,
+// real credentials in CI — or something standing in for it, and anything
+// standing in for it is code written here whether it runs in a container or
+// in this process. A container would add a hop without adding a single byte
+// of fidelity, which is why this carries no build tag at all: it needs
+// nothing more than an httptest.Server already gives it.
 //
 // So this drives the adapter over real HTTP, on a real socket, against a
 // listener that asserts the exact request Mailgun would have received: the
@@ -214,6 +212,55 @@ func TestConfigIsCheckedWhenTheSenderIsBuilt(t *testing.T) {
 			require.Error(t, err, "an unusable sender was built anyway")
 		})
 	}
+}
+
+// Sending to the wrong region fails authentication rather than redirecting, so
+// a typo here is worth refusing at startup rather than on the first
+// submission.
+func TestAnUnknownRegionIsRefused(t *testing.T) {
+	_, err := mailgun.New(mailgun.Config{
+		Domain: "mg.example.com",
+		APIKey: "key-secret",
+		Region: "antarctica",
+		From:   "site@mg.example.com",
+		To:     "info@example.com",
+	})
+
+	require.ErrorIs(t, err, mailgun.ErrBadRegion)
+}
+
+// A timeout is the network having a bad minute, not a rejected key — the
+// handler tells the two apart by Op, and this is the only path that produces
+// "timeout" rather than "send".
+func TestATimeoutIsReportedAsSuchNotAsARefusal(t *testing.T) {
+	blocks := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-blocks
+	}))
+	// Cleanups run LIFO, and Close waits for the handler goroutine above to
+	// return - so blocks has to close first, or Close blocks forever waiting
+	// on a handler that is waiting right back on it.
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { close(blocks) })
+
+	sender, err := mailgun.New(mailgun.Config{
+		Domain:  "mg.example.com",
+		APIKey:  "key-secret",
+		BaseURL: srv.URL,
+		From:    "site@mg.example.com",
+		To:      "info@example.com",
+		Timeout: 10 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	err = sender.Send(context.Background(), contact.Message{
+		Name: "Ada", Email: "ada@example.com", Subject: "s", Body: "b",
+	})
+
+	var de *contact.DeliveryError
+	require.ErrorAs(t, err, &de)
+	assert.Equal(t, "timeout", de.Op, "a deadline exceeded was reported as a generic send failure")
 }
 
 func mustSender(t *testing.T, baseURL string) *mailgun.Sender {
