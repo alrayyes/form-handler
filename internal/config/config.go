@@ -252,35 +252,11 @@ type yamlForm struct {
 // whichever password was named. Field by field, so a form that only overrides
 // the username keeps the shared address.
 func resolveSMTP(defaults, form *yamlSMTP, where string) (*SMTP, error) {
-	merged := yamlSMTP{}
-	for _, layer := range []*yamlSMTP{defaults, form} {
-		if layer == nil {
-			continue
-		}
-		if layer.Addr != "" {
-			merged.Addr = layer.Addr
-		}
-		if layer.Username != "" {
-			merged.Username = layer.Username
-		}
-		if layer.Password != "" {
-			merged.Password = layer.Password
-			merged.PasswordEnv = ""
-		}
-		if layer.PasswordEnv != "" {
-			merged.PasswordEnv = layer.PasswordEnv
-			merged.Password = ""
-		}
+	if err := validateSMTPLayers(defaults, form, where); err != nil {
+		return nil, err
 	}
 
-	// Both set in the same layer is a question about which one wins, and any
-	// answer would be somebody's surprise.
-	if form != nil && form.Password != "" && form.PasswordEnv != "" {
-		return nil, &FormError{Form: where, Field: "smtp", Reason: "set password or password_env, not both"}
-	}
-	if defaults != nil && defaults.Password != "" && defaults.PasswordEnv != "" {
-		return nil, &FormError{Form: where, Field: "smtp", Reason: "file defaults set password and password_env, not both"}
-	}
+	merged := mergeSMTPLayers(defaults, form)
 
 	out := &SMTP{
 		Addr:     merged.Addr,
@@ -309,6 +285,47 @@ func resolveSMTP(defaults, form *yamlSMTP, where string) (*SMTP, error) {
 	}
 
 	return out, nil
+}
+
+// mergeSMTPLayers layers a form's smtp block over the file's defaults, field
+// by field.
+func mergeSMTPLayers(defaults, form *yamlSMTP) yamlSMTP {
+	merged := yamlSMTP{}
+	for _, layer := range []*yamlSMTP{defaults, form} {
+		if layer == nil {
+			continue
+		}
+		if layer.Addr != "" {
+			merged.Addr = layer.Addr
+		}
+		if layer.Username != "" {
+			merged.Username = layer.Username
+		}
+		if layer.Password != "" {
+			merged.Password = layer.Password
+			merged.PasswordEnv = ""
+		}
+		if layer.PasswordEnv != "" {
+			merged.PasswordEnv = layer.PasswordEnv
+			merged.Password = ""
+		}
+	}
+
+	return merged
+}
+
+// validateSMTPLayers rejects a layer that sets both password and
+// password_env: both set in the same layer is a question about which one
+// wins, and any answer would be somebody's surprise.
+func validateSMTPLayers(defaults, form *yamlSMTP, where string) error {
+	if form != nil && form.Password != "" && form.PasswordEnv != "" {
+		return &FormError{Form: where, Field: "smtp", Reason: "set password or password_env, not both"}
+	}
+	if defaults != nil && defaults.Password != "" && defaults.PasswordEnv != "" {
+		return &FormError{Form: where, Field: "smtp", Reason: "file defaults set password and password_env, not both"}
+	}
+
+	return nil
 }
 
 // ParseForms reads a forms file and returns the forms it describes.
@@ -361,31 +378,11 @@ func ParseForms(r io.Reader) ([]Form, error) {
 // resolveMailgun layers a form's mailgun block over the file's defaults and
 // reads the named key.
 func resolveMailgun(defaults, form *yamlMailgun, where string) (*Mailgun, error) {
-	merged := yamlMailgun{}
-	for _, layer := range []*yamlMailgun{defaults, form} {
-		if layer == nil {
-			continue
-		}
-		if layer.Domain != "" {
-			merged.Domain = layer.Domain
-		}
-		if layer.Region != "" {
-			merged.Region = layer.Region
-		}
-		if layer.BaseURL != "" {
-			merged.BaseURL = layer.BaseURL
-		}
-		if layer.APIKey != "" {
-			merged.APIKey, merged.APIKeyEnv = layer.APIKey, ""
-		}
-		if layer.APIKeyEnv != "" {
-			merged.APIKeyEnv, merged.APIKey = layer.APIKeyEnv, ""
-		}
-	}
-
 	if form != nil && form.APIKey != "" && form.APIKeyEnv != "" {
 		return nil, &FormError{Form: where, Field: "mailgun", Reason: "set api_key or api_key_env, not both"}
 	}
+
+	merged := mergeMailgunLayers(defaults, form)
 
 	out := &Mailgun{
 		Domain:  merged.Domain,
@@ -418,6 +415,34 @@ func resolveMailgun(defaults, form *yamlMailgun, where string) (*Mailgun, error)
 	}
 
 	return out, nil
+}
+
+// mergeMailgunLayers layers a form's mailgun block over the file's defaults,
+// field by field.
+func mergeMailgunLayers(defaults, form *yamlMailgun) yamlMailgun {
+	merged := yamlMailgun{}
+	for _, layer := range []*yamlMailgun{defaults, form} {
+		if layer == nil {
+			continue
+		}
+		if layer.Domain != "" {
+			merged.Domain = layer.Domain
+		}
+		if layer.Region != "" {
+			merged.Region = layer.Region
+		}
+		if layer.BaseURL != "" {
+			merged.BaseURL = layer.BaseURL
+		}
+		if layer.APIKey != "" {
+			merged.APIKey, merged.APIKeyEnv = layer.APIKey, ""
+		}
+		if layer.APIKeyEnv != "" {
+			merged.APIKeyEnv, merged.APIKey = layer.APIKeyEnv, ""
+		}
+	}
+
+	return merged
 }
 
 // resolveProvider decides how one form sends, and refuses anything ambiguous.
@@ -475,38 +500,58 @@ func validate(forms []Form) error {
 	seen := make(map[string]bool, len(forms))
 	for i, f := range forms {
 		where := describe(i, f.ID)
-
-		switch {
-		case f.ID == "":
-			return &FormError{Form: where, Field: "id", Reason: "is required"}
-		case !formID.MatchString(f.ID):
-			return &FormError{Form: where, Field: "id", Reason: "must match " + formID.String()}
-		case seen[f.ID]:
-			return &FormError{Form: where, Field: "id", Reason: "is used by more than one form"}
+		if err := validateFormID(where, f.ID, seen); err != nil {
+			return err
 		}
 		seen[f.ID] = true
 
-		if len(f.Origins) == 0 {
-			return &FormError{Form: where, Field: "origins", Reason: "at least one is required"}
+		if err := validateFormFields(where, f); err != nil {
+			return err
 		}
-		for _, o := range f.Origins {
-			if err := validOrigin(o); err != nil {
-				return &FormError{Form: where, Field: "origins", Reason: fmt.Sprintf("%q: %v", o, err)}
-			}
-		}
+	}
 
-		for _, addr := range []struct{ field, value string }{{"from", f.From}, {"to", f.To}} {
-			if strings.TrimSpace(addr.value) == "" {
-				return &FormError{Form: where, Field: addr.field, Reason: "is required"}
-			}
-			if _, err := mail.ParseAddress(addr.value); err != nil {
-				return &FormError{Form: where, Field: addr.field, Reason: fmt.Sprintf("%q is not a valid address", addr.value)}
-			}
-		}
+	return nil
+}
 
-		if _, err := template.New("subject").Parse(f.Subject); err != nil {
-			return &FormError{Form: where, Field: "subject", Reason: err.Error()}
+// validateFormID checks the one field validate needs seen across forms to
+// judge, so the id-uniqueness check has somewhere to live outside the loop
+// that owns seen.
+func validateFormID(where, id string, seen map[string]bool) error {
+	switch {
+	case id == "":
+		return &FormError{Form: where, Field: "id", Reason: "is required"}
+	case !formID.MatchString(id):
+		return &FormError{Form: where, Field: "id", Reason: "must match " + formID.String()}
+	case seen[id]:
+		return &FormError{Form: where, Field: "id", Reason: "is used by more than one form"}
+	}
+
+	return nil
+}
+
+// validateFormFields checks everything about one form that does not depend
+// on the others: its origins, its addresses and its subject template.
+func validateFormFields(where string, f Form) error {
+	if len(f.Origins) == 0 {
+		return &FormError{Form: where, Field: "origins", Reason: "at least one is required"}
+	}
+	for _, o := range f.Origins {
+		if err := validOrigin(o); err != nil {
+			return &FormError{Form: where, Field: "origins", Reason: fmt.Sprintf("%q: %v", o, err)}
 		}
+	}
+
+	for _, addr := range []struct{ field, value string }{{"from", f.From}, {"to", f.To}} {
+		if strings.TrimSpace(addr.value) == "" {
+			return &FormError{Form: where, Field: addr.field, Reason: "is required"}
+		}
+		if _, err := mail.ParseAddress(addr.value); err != nil {
+			return &FormError{Form: where, Field: addr.field, Reason: fmt.Sprintf("%q is not a valid address", addr.value)}
+		}
+	}
+
+	if _, err := template.New("subject").Parse(f.Subject); err != nil {
+		return &FormError{Form: where, Field: "subject", Reason: err.Error()}
 	}
 
 	return nil

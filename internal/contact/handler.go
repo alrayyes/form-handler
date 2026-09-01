@@ -136,6 +136,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sub, ok := h.decode(w, r)
+	if !ok {
+		return
+	}
+
+	msg, ok := h.validate(w, r, origin, sub)
+	if !ok {
+		return
+	}
+
+	h.deliver(w, r, msg)
+}
+
+// decode reads and parses the request body, refusing and answering the
+// request itself on any failure.
+func (h *Handler) decode(w http.ResponseWriter, r *http.Request) (Submission, bool) {
 	// Cap the body before decoding. Without this the service will happily read
 	// as much as anyone cares to send before finding out it was too long.
 	var sub Submission
@@ -147,16 +163,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// "somebody is poking at this".
 		h.refuse(w, r, http.StatusBadRequest, errorBody{Error: "could not read submission"}, "detail", logsafe.String(err.Error()))
 
-		return
+		return Submission{}, false
 	}
 
+	return sub, true
+}
+
+// validate applies the domain rules to a decoded submission, refusing and
+// answering the request itself on any rejection.
+func (h *Handler) validate(w http.ResponseWriter, r *http.Request, origin string, sub Submission) (Message, bool) {
 	// Every way this can be turned down is a case here, because Rejection is a
 	// closed set. There is no fallback branch, and there is nothing for one to
 	// catch.
 	msg, rejected := Validate(sub)
 	switch rejected := rejected.(type) {
 	case nil:
-		// Accepted. The send is below.
+		return msg, true
 	case spam:
 		// Answer exactly as a success does. A bot that can tell the difference
 		// learns which field gave it away.
@@ -164,15 +186,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"reason", "honeypot", "ip", h.clientIP.From(r), "origin", logsafe.String(origin))
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 
-		return
+		return Message{}, false
 	case ValidationError:
 		h.refuse(w, r, http.StatusUnprocessableEntity, errorBody{
 			Error: "invalid submission", Field: rejected.Field, Reason: rejected.Reason,
 		}, "field", rejected.Field, "why", rejected.Reason)
 
-		return
+		return Message{}, false
 	}
 
+	return Message{}, false
+}
+
+// deliver renders the subject and sends the message, answering the request
+// with the outcome either way.
+func (h *Handler) deliver(w http.ResponseWriter, r *http.Request, msg Message) {
 	subject, err := h.subjectFor(msg)
 	if err != nil {
 		h.log.Error("could not build subject", "form", h.form.ID,

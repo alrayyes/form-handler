@@ -80,6 +80,14 @@ func Contract(t *testing.T, s Subject) {
 	require.NotEmpty(t, s.Provider, "a Subject has to say what its DeliveryError is named")
 	require.NotNil(t, s.Failing, "the contract is mostly about how a Mailer fails, so this cannot be skipped")
 
+	contractDelivery(t, s)
+	contractFailure(t, s)
+}
+
+// contractDelivery checks the paths that need a working Mailer.
+func contractDelivery(t *testing.T, s Subject) {
+	t.Helper()
+
 	t.Run("a delivered message is not an error", func(t *testing.T) {
 		if s.Working == nil {
 			t.Skip("no deliverable Mailer supplied: the success path is covered elsewhere")
@@ -89,6 +97,27 @@ func Contract(t *testing.T, s Subject) {
 
 		require.NoError(t, err)
 	})
+
+	t.Run("a cancelled context is not ignored", func(t *testing.T) {
+		if s.Working == nil {
+			t.Skip("no deliverable Mailer supplied: cancellation would be indistinguishable from the failure")
+		}
+
+		// Send is on the request path. A visitor who has closed the tab should
+		// not be holding a connection to a mail server open.
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := s.Working(t).Send(ctx, message())
+
+		var de *contact.DeliveryError
+		require.ErrorAs(t, err, &de, "a cancelled context was delivered anyway, or failed untyped")
+	})
+}
+
+// contractFailure checks what a failing Mailer reports.
+func contractFailure(t *testing.T, s Subject) {
+	t.Helper()
 
 	t.Run("a refused message is an error", func(t *testing.T) {
 		// A form that says "thanks" and drops the message is worse than one
@@ -144,21 +173,5 @@ func Contract(t *testing.T, s Subject) {
 		err := s.Failing(t).Send(context.Background(), message())
 
 		require.ErrorIs(t, err, s.Cause, "the cause was rebuilt rather than wrapped, so errors.Is no longer finds it")
-	})
-
-	t.Run("a cancelled context is not ignored", func(t *testing.T) {
-		if s.Working == nil {
-			t.Skip("no deliverable Mailer supplied: cancellation would be indistinguishable from the failure")
-		}
-
-		// Send is on the request path. A visitor who has closed the tab should
-		// not be holding a connection to a mail server open.
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		err := s.Working(t).Send(ctx, message())
-
-		var de *contact.DeliveryError
-		require.ErrorAs(t, err, &de, "a cancelled context was delivered anyway, or failed untyped")
 	})
 }

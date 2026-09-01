@@ -125,17 +125,8 @@ func converse(conn net.Conn, refuse refuseAt, got *received) {
 			say("250 OK")
 		case "DATA":
 			say("354 go ahead")
-			for {
-				l, err := r.ReadString('\n')
-				if err != nil {
-					return
-				}
-				if strings.TrimRight(l, "\r\n") == "." {
-					break
-				}
-				got.mu.Lock()
-				got.body.WriteString(l)
-				got.mu.Unlock()
+			if !readBody(r, got) {
+				return
 			}
 			say("250 OK")
 		case "QUIT":
@@ -145,6 +136,23 @@ func converse(conn net.Conn, refuse refuseAt, got *received) {
 		default:
 			say("500 unrecognised")
 		}
+	}
+}
+
+// readBody reads the DATA section up to the lone "." that ends it, and
+// reports whether the connection stayed alive to see it.
+func readBody(r *bufio.Reader, got *received) bool {
+	for {
+		l, err := r.ReadString('\n')
+		if err != nil {
+			return false
+		}
+		if strings.TrimRight(l, "\r\n") == "." {
+			return true
+		}
+		got.mu.Lock()
+		got.body.WriteString(l)
+		got.mu.Unlock()
 	}
 }
 

@@ -81,28 +81,30 @@ func TestAnOmittedSubjectTakesTheDefault(t *testing.T) {
 	assert.Equal(t, contact.DefaultSubject, forms[1].Subject)
 }
 
-func TestParseRejectsBadConfig(t *testing.T) {
-	cases := map[string]struct {
-		yaml string
-		want string
-	}{
-		"no forms at all": {`forms: []`, "at least one form"},
-		"missing id": {`
+// badConfigCases is the data for TestParseRejectsBadConfig, kept out of the
+// function itself so the test reads as "run every case" rather than as one
+// long function funlen has to be told to ignore.
+var badConfigCases = map[string]struct {
+	yaml string
+	want string
+}{
+	"no forms at all": {`forms: []`, "at least one form"},
+	"missing id": {`
 forms:
   - origins: ["https://www.example.com"]
     from: site@example.com
     to: info@example.com
 `, "id"},
-		// The id is the last segment of the URL, so it has to survive being in
-		// one. A slash would silently register a different route.
-		"id is not url safe": {`
+	// The id is the last segment of the URL, so it has to survive being in
+	// one. A slash would silently register a different route.
+	"id is not url safe": {`
 forms:
   - id: "marketing/live"
     origins: ["https://www.example.com"]
     from: site@example.com
     to: info@example.com
 `, "id"},
-		"duplicate ids": {`
+	"duplicate ids": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -113,47 +115,47 @@ forms:
     from: site@example.com
     to: other@example.com
 `, "more than one form"},
-		// Fail closed. A form nobody may post to is a mistake worth hearing
-		// about at startup, not a form that quietly accepts everybody.
-		"no origins": {`
+	// Fail closed. A form nobody may post to is a mistake worth hearing
+	// about at startup, not a form that quietly accepts everybody.
+	"no origins": {`
 forms:
   - id: marketing
     origins: []
     from: site@example.com
     to: info@example.com
 `, "origin"},
-		"origin is not an origin": {`
+	"origin is not an origin": {`
 forms:
   - id: marketing
     origins: ["www.example.com"]
     from: site@example.com
     to: info@example.com
 `, "origin"},
-		// An Origin header is scheme://host[:port] and nothing else, so a
-		// configured origin carrying a path would never match one.
-		"origin has a path": {`
+	// An Origin header is scheme://host[:port] and nothing else, so a
+	// configured origin carrying a path would never match one.
+	"origin has a path": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com/contact"]
     from: site@example.com
     to: info@example.com
 `, "origin"},
-		"missing recipient": {`
+	"missing recipient": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
     from: site@example.com
 `, "to"},
-		"sender is not an address": {`
+	"sender is not an address": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
     from: not-an-address
     to: info@example.com
 `, "from"},
-		// A typo in a key would otherwise be silently ignored, and the form
-		// would run with a default nobody chose.
-		"unknown key": {`
+	// A typo in a key would otherwise be silently ignored, and the form
+	// would run with a default nobody chose.
+	"unknown key": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -161,7 +163,7 @@ forms:
     to: info@example.com
     recipients: everyone@example.com
 `, "recipients"},
-		"bad subject template": {`
+	"bad subject template": {`
 forms:
   - id: marketing
     origins: ["https://www.example.com"]
@@ -169,9 +171,10 @@ forms:
     to: info@example.com
     subject: "Contact form: {{ .Name"
 `, "subject"},
-	}
+}
 
-	for name, tc := range cases {
+func TestParseRejectsBadConfig(t *testing.T) {
+	for name, tc := range badConfigCases {
 		t.Run(name, func(t *testing.T) {
 			_, err := parse(t, tc.yaml)
 
