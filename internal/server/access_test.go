@@ -76,7 +76,7 @@ func TestEveryRequestIsLogged(t *testing.T) {
 	require.Len(t, entries, 1, "a request went unlogged")
 	assert.Equal(t, "GET", entries[0]["method"])
 	assert.Equal(t, "/healthz", entries[0]["path"])
-	assert.Equal(t, float64(200), entries[0]["status"])
+	assert.Equal(t, 200, int(entries[0]["status"].(float64)))
 	assert.Contains(t, entries[0], "duration_ms", "how long it took is half the point of an access log")
 }
 
@@ -99,7 +99,7 @@ func TestAPathNobodyServesIsStillLogged(t *testing.T) {
 	entries := lines()
 	require.Len(t, entries, 1, "a request for an unknown path left no trace")
 	assert.Equal(t, "/wp-login.php", entries[0]["path"])
-	assert.Equal(t, float64(404), entries[0]["status"])
+	assert.Equal(t, 404, int(entries[0]["status"].(float64)))
 }
 
 // A browser asks before it posts. If the preflight is being refused, nothing
@@ -116,7 +116,7 @@ func TestThePreflightIsLogged(t *testing.T) {
 	entries := lines()
 	require.NotEmpty(t, entries)
 	assert.Equal(t, "OPTIONS", entries[0]["method"])
-	assert.Equal(t, float64(204), entries[0]["status"])
+	assert.Equal(t, 204, int(entries[0]["status"].(float64)))
 }
 
 // Level by outcome, so "show me what is going wrong" is a filter rather than a
@@ -161,7 +161,7 @@ func TestARefusalGetsBothAnAccessLineAndAReason(t *testing.T) {
 		switch e["msg"] {
 		case "request":
 			access = true
-			assert.Equal(t, float64(403), e["status"])
+			assert.Equal(t, 403, int(e["status"].(float64)))
 		case "refused submission":
 			reason = true
 			assert.Equal(t, "origin not allowed", e["reason"])

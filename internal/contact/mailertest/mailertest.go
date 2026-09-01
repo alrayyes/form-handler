@@ -133,7 +133,7 @@ func Contract(t *testing.T, s Subject) {
 		// Unwrap is what stops the adapter's own typed errors being flattened
 		// into a sentence on the way out. Only a floor — see the next case, and
 		// Subject.Cause.
-		assert.NotNil(t, errors.Unwrap(de), "the underlying error was thrown away")
+		assert.Error(t, errors.Unwrap(de), "the underlying error was thrown away")
 	})
 
 	t.Run("a failure still matches the cause it was given", func(t *testing.T) {

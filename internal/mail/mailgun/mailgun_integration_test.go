@@ -54,7 +54,12 @@ func stubMailgun(t *testing.T, status int, body string) (baseURL string, got *ca
 		got.path = r.URL.Path
 		got.user, got.password, _ = r.BasicAuth()
 
-		require.NoError(t, r.ParseMultipartForm(1<<20), "Mailgun sends a multipart form")
+		// require inside a handler goroutine would only kill that goroutine on
+		// failure, not the test — assert plus an explicit return is what
+		// actually stops it here.
+		if !assert.NoError(t, r.ParseMultipartForm(1<<20), "Mailgun sends a multipart form") {
+			return
+		}
 		for k, v := range r.MultipartForm.Value {
 			if len(v) > 0 {
 				got.fields[k] = v[0]

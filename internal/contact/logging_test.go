@@ -58,7 +58,7 @@ func TestEveryRefusalIsLogged(t *testing.T) {
 		method string
 		origin string
 		body   string
-		status float64
+		status int
 	}{
 		"origin not allowed": {http.MethodPost, "https://someone-else.example", goodBody, 403},
 		"unreadable body":    {http.MethodPost, origin, `{"name":`, 400},
@@ -76,11 +76,11 @@ func TestEveryRefusalIsLogged(t *testing.T) {
 			res := httptest.NewRecorder()
 			h.ServeHTTP(res, req)
 
-			require.Equal(t, int(tc.status), res.Code)
+			require.Equal(t, tc.status, res.Code)
 
 			entries := lines()
 			require.Len(t, entries, 1, "a refused submission logged nothing")
-			assert.Equal(t, tc.status, entries[0]["status"])
+			assert.Equal(t, tc.status, int(entries[0]["status"].(float64)))
 			assert.Equal(t, "marketing", entries[0]["form"], "which form was refused")
 			assert.NotEmpty(t, entries[0]["reason"], "a status code alone does not say why")
 		})
@@ -110,7 +110,7 @@ func TestRateLimitingIsLogged(t *testing.T) {
 
 	entries := lines()
 	require.Len(t, entries, 2, "the refusal after the limit was not logged")
-	assert.Equal(t, float64(429), entries[1]["status"])
+	assert.Equal(t, 429, int(entries[1]["status"].(float64)))
 	assert.Equal(t, "WARN", entries[1]["level"])
 }
 
@@ -193,5 +193,5 @@ func TestAcceptedSubmissionsAreStillLogged(t *testing.T) {
 
 	entries := lines()
 	require.Len(t, entries, 1)
-	assert.Equal(t, float64(202), entries[0]["status"])
+	assert.Equal(t, 202, int(entries[0]["status"].(float64)))
 }
