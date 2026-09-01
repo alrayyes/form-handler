@@ -35,6 +35,15 @@ const (
 // a visitor's browser open.
 const DefaultTimeout = 10 * time.Second
 
+// ErrConfigInvalid is returned when New's configuration fails validation. The
+// detail naming which field is appended to it, not folded into a second
+// dynamic error.
+var ErrConfigInvalid = errors.New("mailgun: invalid configuration")
+
+// ErrBadRegion is returned when Config.Region is set to anything but RegionUS
+// or RegionEU.
+var ErrBadRegion = errors.New("mailgun: region is not us or eu")
+
 // Config is everything one form needs to send through Mailgun.
 type Config struct {
 	// Domain is the sending domain as Mailgun knows it, usually mg.example.com
@@ -89,7 +98,7 @@ func New(cfg Config) (*Sender, error) {
 		}
 	}
 	if len(problems) > 0 {
-		return nil, fmt.Errorf("mailgun: %s", strings.Join(problems, "; "))
+		return nil, fmt.Errorf("%w: %s", ErrConfigInvalid, strings.Join(problems, "; "))
 	}
 
 	client := mg.NewMailgun(cfg.APIKey)
@@ -102,7 +111,7 @@ func New(cfg Config) (*Sender, error) {
 		case RegionUS, "":
 			base = mg.APIBaseUS
 		default:
-			return nil, fmt.Errorf("mailgun: region %q is not %q or %q", cfg.Region, RegionUS, RegionEU)
+			return nil, fmt.Errorf("%w: %q", ErrBadRegion, cfg.Region)
 		}
 	}
 	if err := client.SetAPIBase(base); err != nil {

@@ -2,7 +2,26 @@
 
 package config
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// Sentinels for the environment-variable and origin validation errors below —
+// named so a caller can tell one failure from another with errors.Is, rather
+// than matching on a formatted sentence.
+var (
+	ErrRequiredWhenNoFormsFile        = errors.New("is required when FORMS_FILE is not set")
+	ErrOriginsRequiredWhenNoFormsFile = errors.New("ALLOWED_ORIGINS is required when FORMS_FILE is not set")
+	ErrRateLimitNotANumber            = errors.New("RATE_LIMIT_PER_HOUR must be a number")
+	ErrNoFormsConfigured              = errors.New("at least one form must be configured")
+	ErrLogLevelInvalid                = errors.New("LOG_LEVEL is not debug, info, warn or error")
+
+	ErrOriginNotAURL   = errors.New("not a URL")
+	ErrOriginBadScheme = errors.New("must start with http:// or https://")
+	ErrOriginNoHost    = errors.New("has no host")
+	ErrOriginHasExtra  = errors.New("must be scheme://host[:port] with nothing after it")
+)
 
 // FormError says which form was wrong and what about it.
 //

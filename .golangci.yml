@@ -5,6 +5,7 @@ linters:
   enable:
     - bodyclose
     - dupl
+    - err113
     - errorlint
     - gocritic
     - gosec

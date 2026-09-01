@@ -4,6 +4,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +18,12 @@ import (
 	"github.com/alrayyes/form-handler/internal/mail/smtp"
 	"github.com/alrayyes/form-handler/internal/ratelimit"
 )
+
+// ErrNoMailProvider is returned when a Form has neither SMTP nor Mailgun
+// configured. config.Load and config.LoadForms both refuse to produce a Form
+// like this, so reaching it means the two have drifted apart rather than
+// that somebody misconfigured something.
+var ErrNoMailProvider = errors.New("no mail provider configured")
 
 // New builds the handler for every configured form.
 //
@@ -138,8 +145,6 @@ func mailerFor(f config.Form) (contact.Mailer, error) {
 		}, nil
 
 	default:
-		// config refuses to produce this, so reaching it means the two have
-		// drifted apart rather than that somebody misconfigured something.
-		return nil, fmt.Errorf("form %q: no mail provider configured", f.ID)
+		return nil, fmt.Errorf("form %q: %w", f.ID, ErrNoMailProvider)
 	}
 }

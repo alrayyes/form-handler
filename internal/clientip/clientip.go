@@ -14,6 +14,7 @@
 package clientip
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,6 +22,10 @@ import (
 	"slices"
 	"strings"
 )
+
+// ErrNotAnAddressOrCIDR is returned when a trusted-proxy entry is neither a
+// bare IP address nor a CIDR.
+var ErrNotAnAddressOrCIDR = errors.New("not an address or CIDR")
 
 // Unknown is returned when nothing usable could be determined. It is a value
 // rather than an empty string so a log line and a rate-limit key both say
@@ -62,7 +67,7 @@ func NewResolver(trusted []string) (Resolver, error) {
 
 		addr, err := netip.ParseAddr(raw)
 		if err != nil {
-			return Resolver{}, fmt.Errorf("trusted proxy %q: not an address or CIDR", raw)
+			return Resolver{}, fmt.Errorf("trusted proxy %q: %w: %w", raw, ErrNotAnAddressOrCIDR, err)
 		}
 		prefixes = append(prefixes, netip.PrefixFrom(addr, addr.BitLen()))
 	}

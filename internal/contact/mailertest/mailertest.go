@@ -27,6 +27,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ErrMailServerDown is a cause a Fake can be told to fail with, and the one
+// every package testing against a broken Mailer reaches for instead of
+// minting its own — named so the contract can check the fake wraps this
+// specific error rather than rebuilding it.
+var ErrMailServerDown = errors.New("mail server is down")
+
 // Subject is one implementation, and the two states the contract needs it in.
 type Subject struct {
 	// Provider is the name a DeliveryError from this Mailer carries.
