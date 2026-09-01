@@ -15,6 +15,7 @@ linters:
     - nlreturn
     - revive
     - sqlclosecheck
+    - testifylint
     - thelper
     - unconvert
     - unparam
@@ -30,6 +31,8 @@ linters:
         # The SMTP address comes from configuration this service owns, not from
         # a request, and the bridge it talks to may legitimately be plaintext.
         - G402
+    testifylint:
+      enable-all: true
     wrapcheck:
       extra-ignore-sigs:
         # contact.Undeliverable already wraps err in a *DeliveryError with its
