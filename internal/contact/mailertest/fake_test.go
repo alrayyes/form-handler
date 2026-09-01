@@ -4,7 +4,6 @@ package mailertest_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/alrayyes/form-handler/internal/contact"
@@ -17,10 +16,10 @@ import (
 // it is just a struct that happens to compile, and every test using it is
 // asserting against behaviour nothing in production shares.
 func TestTheFakeKeepsTheMailerContract(t *testing.T) {
-	// Named, so the contract can check the fake wraps it rather than rebuilding
-	// it. The real adapters cannot supply this — their failures come from a mail
-	// server — which is why the fake is the one that has to prove it.
-	down := errors.New("mail server is down")
+	// The real adapters cannot supply this — their failures come from a mail
+	// server — which is why the fake is the one that has to prove it wraps
+	// what it was given rather than rebuilding it.
+	down := mailertest.ErrMailServerDown
 
 	mailertest.Contract(t, mailertest.Subject{
 		Provider: mailertest.Provider,
@@ -62,7 +61,7 @@ func TestSentIsSafeToReadWhileSending(t *testing.T) {
 }
 
 func TestABrokenFakeDeliversNothing(t *testing.T) {
-	f := mailertest.NewFake().Breaks(errors.New("mail server is down"))
+	f := mailertest.NewFake().Breaks(mailertest.ErrMailServerDown)
 
 	require.Error(t, f.Send(context.Background(), contact.Message{Name: "Ada"}))
 

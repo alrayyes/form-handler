@@ -3,7 +3,6 @@
 package contact_test
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -137,7 +136,7 @@ func TestARefusedOriginDoesNotConsumeTheRateLimit(t *testing.T) {
 }
 
 func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
-	mailer := mailertest.NewFake().Breaks(errors.New("mail server is down"))
+	mailer := mailertest.NewFake().Breaks(mailertest.ErrMailServerDown)
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
 

@@ -154,7 +154,7 @@ func formFromEnv() (Form, error) {
 		{"MAIL_TO", form.To},
 	} {
 		if strings.TrimSpace(required.value) == "" {
-			return Form{}, fmt.Errorf("%s is required when FORMS_FILE is not set", required.name)
+			return Form{}, fmt.Errorf("%s %w", required.name, ErrRequiredWhenNoFormsFile)
 		}
 	}
 
@@ -162,7 +162,7 @@ func formFromEnv() (Form, error) {
 	// consequence of guessing is somebody else's page using this mailbox.
 	origins := os.Getenv("ALLOWED_ORIGINS")
 	if strings.TrimSpace(origins) == "" {
-		return Form{}, errors.New("ALLOWED_ORIGINS is required when FORMS_FILE is not set")
+		return Form{}, ErrOriginsRequiredWhenNoFormsFile
 	}
 	for o := range strings.SplitSeq(origins, ",") {
 		if o = strings.TrimSpace(o); o != "" {
@@ -174,7 +174,7 @@ func formFromEnv() (Form, error) {
 	if raw := os.Getenv("RATE_LIMIT_PER_HOUR"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			return Form{}, errors.New("RATE_LIMIT_PER_HOUR must be a number")
+			return Form{}, fmt.Errorf("%w: %w", ErrRateLimitNotANumber, err)
 		}
 		form.RateLimitPerHour = n
 	}
@@ -469,7 +469,7 @@ func resolveProvider(file *yamlFile, form yamlForm, where string) (*SMTP, *Mailg
 // somewhere nobody is reading.
 func validate(forms []Form) error {
 	if len(forms) == 0 {
-		return errors.New("at least one form must be configured")
+		return ErrNoFormsConfigured
 	}
 
 	seen := make(map[string]bool, len(forms))
@@ -518,15 +518,15 @@ func validate(forms []Form) error {
 func validOrigin(o string) error {
 	u, err := url.Parse(o)
 	if err != nil {
-		return errors.New("not a URL")
+		return fmt.Errorf("%w: %w", ErrOriginNotAURL, err)
 	}
 	switch {
 	case u.Scheme != "http" && u.Scheme != "https":
-		return errors.New("must start with http:// or https://")
+		return ErrOriginBadScheme
 	case u.Host == "":
-		return errors.New("has no host")
+		return ErrOriginNoHost
 	case u.Path != "" || u.RawQuery != "" || u.Fragment != "":
-		return errors.New("must be scheme://host[:port] with nothing after it")
+		return ErrOriginHasExtra
 	}
 
 	return nil
@@ -563,6 +563,6 @@ func parseLevel(raw string) (slog.Level, error) {
 	case "error":
 		return slog.LevelError, nil
 	default:
-		return 0, fmt.Errorf("LOG_LEVEL %q is not debug, info, warn or error", raw)
+		return 0, fmt.Errorf("%w: %q", ErrLogLevelInvalid, raw)
 	}
 }

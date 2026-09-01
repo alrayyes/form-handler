@@ -27,6 +27,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ErrHealthcheckBadStatus is returned when the probe reaches the server but
+// it answers /healthz with anything other than 200.
+var ErrHealthcheckBadStatus = errors.New("healthcheck: unexpected status")
+
 // Run parses args and does what they ask, returning the process exit code.
 // main() may not return, so everything worth asserting on lives here.
 //
@@ -145,7 +149,7 @@ func probe() error {
 	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("status %d", res.StatusCode)
+		return fmt.Errorf("%w: %d", ErrHealthcheckBadStatus, res.StatusCode)
 	}
 
 	return nil
