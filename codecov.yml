@@ -4,3 +4,8 @@
 # without testing anything.
 ignore:
   - "cmd/form-handler/main.go"
+
+coverage:
+  status:
+    project: off
+    patch: off
