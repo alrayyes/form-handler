@@ -60,11 +60,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check the prose this repository owns
+        # safe.directory: actions/checkout's own fix for this writes to a
+        # temporary $HOME that only exists for the checkout step, so it never
+        # reaches this later step's real $HOME in a container-as-root job —
+        # without it, lint-mechanics.sh's own `git ls-files` call fails with
+        # "detected dubious ownership", silently emptying the file list.
         # The same script the pre-push hook runs, so the two cannot disagree
         # about the version, the file list or what counts as a failure.
         # ltex-cli-plus is already on PATH from the job's own container, so
         # this doesn't fetch or cache anything the way the pre-push hook does.
-        run: ./scripts/lint-mechanics.sh
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          ./scripts/lint-mechanics.sh
 
   style:
     runs-on: ubuntu-24.04
