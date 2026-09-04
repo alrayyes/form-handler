@@ -33,6 +33,7 @@ concurrency:
 jobs:
   codeql:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       security-events: write
       actions: read

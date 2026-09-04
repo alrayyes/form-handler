@@ -17,6 +17,7 @@ permissions:
 jobs:
   scorecard:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       security-events: write # uploads the findings to the Security tab
       id-token: write # signs the published result
