@@ -24,6 +24,7 @@ jobs:
       github.event.pull_request.user.login == 'github-actions[bot]' &&
       startsWith(github.event.pull_request.head.ref, 'release-please--branches-')
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: write
       pull-requests: write

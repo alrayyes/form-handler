@@ -29,6 +29,7 @@ jobs:
   # request was what just landed.
   release-please:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write # tags the release and writes it
       pull-requests: write # keeps the release pull request up to date
@@ -46,6 +47,7 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write # attaches the binaries to the release
       packages: write # pushes the image to ghcr.io
