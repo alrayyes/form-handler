@@ -48,15 +48,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     container:
-      image: ghcr.io/alrayyes/ltex-cli-plus@sha256:bf8c54087ad5418da57d9ef5a9604b4dd70aa0737fa0d732b2a2d5cd81e64c18 # 18.7.0
+      # git and nodejs ship in the image itself as of alrayyes/ltex-cli-plus#5 -
+      # actions/checkout needs both, and this job was installing git separately
+      # on top of the image on every run before that.
+      image: ghcr.io/alrayyes/ltex-cli-plus:18.7.0@sha256:22452e86a130e528d526b60792926002983fcbf732bff09bd4e843d22816e4ea
     steps:
-      - name: Install git
-        # The image is built for the CLI, not for checkout; git is the only
-        # thing actions/checkout needs that it doesn't already carry.
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check the prose this repository owns
