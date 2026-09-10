@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.7](https://github.com/alrayyes/form-handler/compare/v2.2.6...v2.2.7) (2026-09-10)
+
+
+### Bug Fixes
+
+* **ci:** switch release auto-merge to pull_request + label gate ([#115](https://github.com/alrayyes/form-handler/issues/115)) ([9f393dc](https://github.com/alrayyes/form-handler/commit/9f393dcc70aab5921d1f11df678cd90665982ab3)), closes [#114](https://github.com/alrayyes/form-handler/issues/114)
+
 ## [2.2.6](https://github.com/alrayyes/form-handler/compare/v2.2.5...v2.2.6) (2026-09-10)
 
 
