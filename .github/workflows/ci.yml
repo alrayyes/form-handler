@@ -58,8 +58,12 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # gotestsum wraps go test for the JUnit report Test Analytics needs,
+      # on top of the same human-readable output go test already gave.
       - name: go test
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+        run: >-
+          go tool gotestsum --junitfile junit.xml --
+          -race -covermode=atomic -coverprofile=coverage.out ./...
       - name: Report coverage
         run: |
           go tool cover -func=coverage.out | tail -1 |
@@ -78,6 +82,14 @@ jobs:
           # Defaults to false, which means a broken upload has never once
           # turned this job red. Worth enforcing now that CODECOV_TOKEN backs
           # it instead of the tokenless fallback.
+          fail_ci_if_error: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && github.event.pull_request.user.login != 'dependabot[bot]' }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report-type: test_results
+          files: junit.xml
           fail_ci_if_error: true
 
   # The outer test, and the one to trust. It posts real requests at the real
