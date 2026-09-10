@@ -12,6 +12,12 @@
 # practice - one successful run ever, then zero runs at all (not even
 # skipped) for the next release PR, which sat until merged by hand
 # (#114).
+#
+# release.yml now opens this PR with RELEASE_TOKEN, not GITHUB_TOKEN
+# (dotfiles#483's action_required wall), so this merge step uses the same
+# token - a GITHUB_TOKEN-authored merge commit is suppressed from
+# triggering further workflow runs, which would leave release.yml never
+# re-firing to actually cut the tag and build the artefacts.
 name: release auto-merge
 
 on: pull_request
@@ -25,13 +31,10 @@ jobs:
     if: "contains(github.event.pull_request.labels.*.name, 'autorelease: pending')"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Enable auto-merge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           # Squash, matching how every release pull request before this one
