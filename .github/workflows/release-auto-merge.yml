@@ -3,26 +3,26 @@
 # that once every required check is green, the same way dependabot-auto-merge
 # does for a dependency bump - nothing is merged here directly, and a red
 # pipeline leaves the release pull request sitting open same as always.
+#
+# pull_request, not pull_request_target: this PR's branch lives on the repo
+# itself, never a fork, so there's no untrusted checkout to guard against,
+# and pull_request_target would trade away the elevated GITHUB_TOKEN
+# permissions GitHub grants a bot-actor'd pull_request event for nothing.
+# The previous pull_request_target version also proved unreliable in
+# practice - one successful run ever, then zero runs at all (not even
+# skipped) for the next release PR, which sat until merged by hand
+# (#114).
 name: release auto-merge
 
-on:
-  pull_request_target:
-
-permissions:
-  contents: read
+on: pull_request
 
 jobs:
   auto-merge:
-    # pull_request_target runs with a write-capable token against the base
-    # branch, so it must never check out or run the pull request's code. It
-    # does not: every step below talks to the API and nothing else.
-    #
-    # Both the author and the branch prefix are checked, not just one - the
-    # author alone would also match a github-actions[bot] pull request this
-    # repo grows later for something that isn't a release.
-    if: |
-      github.event.pull_request.user.login == 'github-actions[bot]' &&
-      startsWith(github.event.pull_request.head.ref, 'release-please--branches-')
+    # release-please labels its own pull request "autorelease: pending" and
+    # re-labels it "autorelease: tagged" once merged - checking the label
+    # rather than the actor and branch, since it doesn't care which
+    # identity or branch name opened the PR at all.
+    if: "contains(github.event.pull_request.labels.*.name, 'autorelease: pending')"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
