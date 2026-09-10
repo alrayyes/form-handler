@@ -8,6 +8,15 @@
 # further workflow run — GitHub refuses, to stop recursive runs. A separate
 # on-tag workflow would silently never fire, and the first symptom is a release
 # with no binaries on it.
+#
+# release-please-action gets RELEASE_TOKEN, not the default GITHUB_TOKEN: a
+# release-please pull request authored by github-actions[bot] sits at
+# action_required with zero jobs run on this repo (confirmed live on PR #116
+# and every check on its branch — ci, codeql, prose, release auto-merge, all
+# action_required with zero jobs) — the same wall documented in dotfiles'
+# rules/releases.md (alrayyes/dotfiles#483). release-auto-merge.yml's merge
+# step has to use the same token for the same reason a mismatched token
+# there would trip GitHub's anti-recursion guard on the merge commit.
 name: release
 
 on:
@@ -40,6 +49,7 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          token: ${{ secrets.RELEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
