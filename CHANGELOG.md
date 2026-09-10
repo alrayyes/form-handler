@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.6](https://github.com/alrayyes/form-handler/compare/v2.2.5...v2.2.6) (2026-09-10)
+
+
+### Bug Fixes
+
+* **ci:** report_type, not report-type ([#111](https://github.com/alrayyes/form-handler/issues/111)) ([d68c8d6](https://github.com/alrayyes/form-handler/commit/d68c8d6ecbed30b469cddb22da038228f3734acf))
+* **deps:** override fast-uri, js-yaml, and smol-toml advisories ([#110](https://github.com/alrayyes/form-handler/issues/110)) ([0ca4c8f](https://github.com/alrayyes/form-handler/commit/0ca4c8faec08b5860e7c05a66a31271203104db9))
+
 ## [2.2.5](https://github.com/alrayyes/form-handler/compare/v2.2.4...v2.2.5) (2026-09-01)
 
 
