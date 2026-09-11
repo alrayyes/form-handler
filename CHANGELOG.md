@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.8](https://github.com/alrayyes/form-handler/compare/v2.2.7...v2.2.8) (2026-09-11)
+
+
+### Bug Fixes
+
+* **ci:** update ltex-cli-plus:18.7.0 pinned digest ([#119](https://github.com/alrayyes/form-handler/issues/119)) ([65acff8](https://github.com/alrayyes/form-handler/commit/65acff8b22f7e4a7315f7a659ffef260137759d1)), closes [#107](https://github.com/alrayyes/form-handler/issues/107)
+
 ## [2.2.7](https://github.com/alrayyes/form-handler/compare/v2.2.6...v2.2.7) (2026-09-10)
 
 
