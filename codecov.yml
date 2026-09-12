@@ -5,6 +5,8 @@
 ignore:
   - "cmd/form-handler/main.go"
 
+comment: false
+
 coverage:
   status:
     project: off
