@@ -21,7 +21,7 @@ whoever changes it.
   that lints the API description, and the [lefthook](https://lefthook.dev) that
   runs the git hooks. There is a `package.json`, but nothing here is
   JavaScript; it exists only so those tools resolve and stay pinned.
-- **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-commit
+- **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-push
   hook runs from your `PATH` while CI runs it pinned. Install that version
   rather than whichever is current: when the two disagree, the hook passes and
   the pipeline fails, and the reason is not obvious from the failure.
@@ -220,13 +220,15 @@ groundwork before the change it made room for, and push with
 
 ## What CI checks
 
-The same commands the hooks run, so a green pre-commit means a green lint
-stage: `gofmt` and `golangci-lint` over the Go, Prettier over the Markdown and
-the YAML and then markdownlint over the Markdown, Biome over the JSON,
-`redocly lint` over the API description, `go test` with the race detector, the
-integration test against a real Mailpit, a CodeQL pass, a `ko build` to prove
-the image still assembles, and the container test running that image for
-real.
+The same commands the hooks run, so a green pre-push means a green lint
+stage: `gofmt` over the Go at commit, `golangci-lint` over the Go at push
+(it type-checks whole packages, so scoping it to staged files would not
+have made it any faster — the cost is the same whether it is paid once a
+push or on every commit), Prettier over the Markdown and the YAML and then
+markdownlint over the Markdown, Biome over the JSON, `redocly lint` over
+the API description, `go test` with the race detector, the integration
+test against a real Mailpit, a CodeQL pass, a `ko build` to prove the image
+still assembles, and the container test running that image for real.
 
 Prose gets two more jobs of its own. `mechanics` runs ltex-cli-plus for grammar
 and spelling and fails the build, because those have a right answer. `style`
