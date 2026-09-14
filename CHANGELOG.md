@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.12](https://github.com/alrayyes/form-handler/compare/v2.2.11...v2.2.12) (2026-09-14)
+
+
+### Bug Fixes
+
+* **lint:** run Go hooks through pinned Docker images ([#137](https://github.com/alrayyes/form-handler/issues/137)) ([0db91ab](https://github.com/alrayyes/form-handler/commit/0db91ab9faf167446e21eb61c070fb8438163758))
+
 ## [2.2.11](https://github.com/alrayyes/form-handler/compare/v2.2.10...v2.2.11) (2026-09-14)
 
 
