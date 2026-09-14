@@ -68,6 +68,7 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 // service answered — health checks, preflights, requests for paths that do not
 // exist — happened in silence.
 func TestEveryRequestIsLogged(t *testing.T) {
+	t.Parallel()
 	h, lines := serve(t, slog.LevelDebug)
 
 	require.Equal(t, http.StatusOK, get(t, h, "/healthz").Code)
@@ -84,6 +85,7 @@ func TestEveryRequestIsLogged(t *testing.T) {
 // thing anybody ever saw, so it is debug — present when asked for, quiet
 // otherwise.
 func TestHealthChecksAreQuietUnlessAskedFor(t *testing.T) {
+	t.Parallel()
 	h, lines := serve(t, slog.LevelInfo)
 
 	get(t, h, "/healthz")
@@ -92,6 +94,7 @@ func TestHealthChecksAreQuietUnlessAskedFor(t *testing.T) {
 }
 
 func TestAPathNobodyServesIsStillLogged(t *testing.T) {
+	t.Parallel()
 	h, lines := serve(t, slog.LevelInfo)
 
 	require.Equal(t, http.StatusNotFound, get(t, h, "/wp-login.php").Code)
@@ -105,6 +108,7 @@ func TestAPathNobodyServesIsStillLogged(t *testing.T) {
 // A browser asks before it posts. If the preflight is being refused, nothing
 // downstream ever happens and the form looks broken for no visible reason.
 func TestThePreflightIsLogged(t *testing.T) {
+	t.Parallel()
 	h, lines := serve(t, slog.LevelInfo)
 
 	req := httptest.NewRequest(http.MethodOptions, "/contact", nil)
@@ -122,6 +126,7 @@ func TestThePreflightIsLogged(t *testing.T) {
 // Level by outcome, so "show me what is going wrong" is a filter rather than a
 // read-through.
 func TestTheLevelFollowsTheOutcome(t *testing.T) {
+	t.Parallel()
 	h, lines := serve(t, slog.LevelDebug)
 
 	get(t, h, "/healthz") // debug
@@ -147,6 +152,7 @@ func TestTheLevelFollowsTheOutcome(t *testing.T) {
 // The access line says what happened; the handler's own line says why. Both are
 // wanted — one is for counting, the other for acting on.
 func TestARefusalGetsBothAnAccessLineAndAReason(t *testing.T) {
+	t.Parallel()
 	h, lines := serve(t, slog.LevelInfo)
 
 	req := httptest.NewRequest(http.MethodPost, "/contact", strings.NewReader(`{}`))

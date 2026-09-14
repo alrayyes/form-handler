@@ -47,6 +47,7 @@ const origin = "https://www.example.com"
 // in-process test already exercises. This is the container's own
 // configuration path, and only the container can prove it works.
 func TestTheContainerAcceptsAndDeliversASubmission(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	image := formHandlerImage(ctx, t)
 	nw := startNetwork(ctx, t)
@@ -78,6 +79,7 @@ func TestTheContainerAcceptsAndDeliversASubmission(t *testing.T) {
 // decide whether to restart the container should not do so because the mail
 // server is briefly unreachable.
 func TestTheContainerHealthcheckIgnoresSMTP(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	image := formHandlerImage(ctx, t)
 

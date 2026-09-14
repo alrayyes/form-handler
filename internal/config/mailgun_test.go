@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestAFormCanSendThroughMailgun(t *testing.T) {
 	t.Setenv("MAILGUN_EXAMPLE_COM", "key-secret")
 
@@ -37,6 +39,9 @@ forms:
 
 // The point of the whole exercise: one service, one form per domain, and each
 // domain's mail leaving through its own provider account.
+//
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestFormsCanUseDifferentProvidersFromEachOther(t *testing.T) {
 	t.Setenv("MAILGUN_EXAMPLE_COM", "key-secret")
 
@@ -65,6 +70,8 @@ forms:
 	assert.Nil(t, forms[1].Mailgun)
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestFileLevelMailgunDefaultsAreInherited(t *testing.T) {
 	t.Setenv("MAILGUN_KEY", "key-secret")
 
@@ -170,6 +177,8 @@ forms:
 `, "must name which"},
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestMailgunConfigIsRejectedWhenItCannotWork(t *testing.T) {
 	t.Setenv("MAILGUN_KEY", "key-secret")
 
@@ -186,6 +195,7 @@ func TestMailgunConfigIsRejectedWhenItCannotWork(t *testing.T) {
 // The forms file names the secret; the deployment supplies it. A file that
 // names one nobody set has to fail at startup, not at the first submission.
 func TestAMissingMailgunKeyIsATypedError(t *testing.T) {
+	t.Parallel()
 	_, err := parse(t, `
 forms:
   - id: marketing
@@ -205,6 +215,7 @@ forms:
 }
 
 func TestABrokenFormIsATypedError(t *testing.T) {
+	t.Parallel()
 	_, err := parse(t, `
 forms:
   - id: marketing

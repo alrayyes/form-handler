@@ -12,6 +12,7 @@ import (
 )
 
 func TestOrdinaryValuesArePassedThrough(t *testing.T) {
+	t.Parallel()
 	for _, v := range []string{
 		"https://www.example.com",
 		"8f2b1c4d5e6f7a8b-AMS",
@@ -27,6 +28,7 @@ func TestOrdinaryValuesArePassedThrough(t *testing.T) {
 // what looks like a second log entry, so a request can claim things about
 // itself that never happened.
 func TestLineBreaksCannotForgeAnEntry(t *testing.T) {
+	t.Parallel()
 	got := logsafe.String("https://evil.example\n{\"level\":\"INFO\",\"msg\":\"sent message\"}")
 
 	assert.NotContains(t, got, "\n")
@@ -37,6 +39,7 @@ func TestLineBreaksCannotForgeAnEntry(t *testing.T) {
 }
 
 func TestOtherControlCharactersComeOutToo(t *testing.T) {
+	t.Parallel()
 	got := logsafe.String("a\tb\x00c\x1b[31md\x7fe")
 
 	for _, bad := range []string{"\t", "\x00", "\x1b", "\x7f"} {
@@ -49,6 +52,7 @@ func TestOtherControlCharactersComeOutToo(t *testing.T) {
 }
 
 func TestLongValuesAreTruncated(t *testing.T) {
+	t.Parallel()
 	got := logsafe.String(strings.Repeat("a", logsafe.Max*3))
 
 	assert.LessOrEqual(t, len([]rune(got)), logsafe.Max+1, "an unbounded value reached the log")
@@ -58,6 +62,7 @@ func TestLongValuesAreTruncated(t *testing.T) {
 // Truncating by bytes would cut a multi-byte rune in half and put an invalid
 // UTF-8 sequence into a JSON log line.
 func TestTruncationDoesNotSplitARune(t *testing.T) {
+	t.Parallel()
 	got := logsafe.String(strings.Repeat("é", logsafe.Max*2))
 
 	require.NotEmpty(t, got)
@@ -68,5 +73,6 @@ func TestTruncationDoesNotSplitARune(t *testing.T) {
 }
 
 func TestEmptyStaysEmpty(t *testing.T) {
+	t.Parallel()
 	assert.Empty(t, logsafe.String(""))
 }

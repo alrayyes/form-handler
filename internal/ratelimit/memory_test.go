@@ -14,6 +14,7 @@ import (
 const caller = "203.0.113.7"
 
 func TestACallerMaySubmitUpToTheLimit(t *testing.T) {
+	t.Parallel()
 	m := ratelimit.New(2, time.Hour)
 
 	require.True(t, m.Allow(caller), "first submission")
@@ -22,6 +23,7 @@ func TestACallerMaySubmitUpToTheLimit(t *testing.T) {
 }
 
 func TestTheSubmissionAfterTheLimitIsRefused(t *testing.T) {
+	t.Parallel()
 	m := ratelimit.New(2, time.Hour)
 	require.True(t, m.Allow(caller))
 	require.True(t, m.Allow(caller))
@@ -33,6 +35,7 @@ func TestTheSubmissionAfterTheLimitIsRefused(t *testing.T) {
 // submissions allowed" — that reading would take a form offline the moment
 // somebody left the setting out.
 func TestALimitOfZeroTurnsItOff(t *testing.T) {
+	t.Parallel()
 	m := ratelimit.New(0, time.Hour)
 	for range 100 {
 		require.True(t, m.Allow(caller))
@@ -45,6 +48,7 @@ func TestALimitOfZeroTurnsItOff(t *testing.T) {
 // key exists for, and behind a proxy it is the difference between limiting
 // visitors and limiting the proxy.
 func TestCallersAreCountedSeparately(t *testing.T) {
+	t.Parallel()
 	m := ratelimit.New(1, time.Hour)
 	require.True(t, m.Allow(caller))
 
@@ -54,6 +58,7 @@ func TestCallersAreCountedSeparately(t *testing.T) {
 // A window that never expired would refuse a caller forever after their first
 // burst. The period is a nanosecond so the test does not wait for one.
 func TestTheWindowForgivesACallerOnceItPasses(t *testing.T) {
+	t.Parallel()
 	m := ratelimit.New(1, time.Nanosecond)
 	require.True(t, m.Allow(caller))
 

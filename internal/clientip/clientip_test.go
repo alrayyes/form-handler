@@ -35,6 +35,7 @@ func resolver(t *testing.T, trusted ...string) clientip.Resolver {
 // so a service that believes it unconditionally hands every caller a fresh
 // rate-limit bucket per request just by varying the header.
 func TestAnUntrustedSenderCannotChooseItsOwnAddress(t *testing.T) {
+	t.Parallel()
 	// Nothing trusted: the zero value of the whole feature, and the default.
 	r := resolver(t)
 
@@ -44,6 +45,7 @@ func TestAnUntrustedSenderCannotChooseItsOwnAddress(t *testing.T) {
 }
 
 func TestWithNoTrustedProxiesTheHeaderIsIgnoredEntirely(t *testing.T) {
+	t.Parallel()
 	r := resolver(t)
 
 	for _, xff := range []string{"198.51.100.1", "10.0.0.1, 198.51.100.1", "nonsense"} {
@@ -55,6 +57,7 @@ func TestWithNoTrustedProxiesTheHeaderIsIgnoredEntirely(t *testing.T) {
 // The reason the header is read at all: behind a proxy, RemoteAddr is the proxy
 // for every visitor, which would rate-limit the whole internet as one client.
 func TestATrustedProxysHeaderIsBelieved(t *testing.T) {
+	t.Parallel()
 	r := resolver(t, "10.0.0.0/8")
 
 	got := r.From(request(t, "10.0.0.5:44321", "198.51.100.1"))
@@ -66,6 +69,7 @@ func TestATrustedProxysHeaderIsBelieved(t *testing.T) {
 // the part contributed by proxies we trust can be believed, so the answer is
 // the rightmost address that is not itself one of ours.
 func TestTheRightmostUntrustedAddressWins(t *testing.T) {
+	t.Parallel()
 	r := resolver(t, "10.0.0.0/8")
 
 	// A visitor claiming to be 1.2.3.4, then the real address our proxy saw,
@@ -76,6 +80,7 @@ func TestTheRightmostUntrustedAddressWins(t *testing.T) {
 }
 
 func TestAChainOfOnlyTrustedProxiesFallsBackToTheConnection(t *testing.T) {
+	t.Parallel()
 	r := resolver(t, "10.0.0.0/8")
 
 	got := r.From(request(t, "10.0.0.5:44321", "10.0.0.9, 10.0.0.8"))
@@ -84,6 +89,7 @@ func TestAChainOfOnlyTrustedProxiesFallsBackToTheConnection(t *testing.T) {
 }
 
 func TestGarbageInTheChainIsNotReturned(t *testing.T) {
+	t.Parallel()
 	r := resolver(t, "10.0.0.0/8")
 
 	got := r.From(request(t, "10.0.0.5:44321", "not-an-address"))
@@ -92,6 +98,7 @@ func TestGarbageInTheChainIsNotReturned(t *testing.T) {
 }
 
 func TestASingleTrustedAddressWorksWithoutAPrefix(t *testing.T) {
+	t.Parallel()
 	r := resolver(t, "10.0.0.5")
 
 	got := r.From(request(t, "10.0.0.5:44321", "198.51.100.1"))
@@ -100,6 +107,7 @@ func TestASingleTrustedAddressWorksWithoutAPrefix(t *testing.T) {
 }
 
 func TestIPv6IsHandled(t *testing.T) {
+	t.Parallel()
 	r := resolver(t, "2001:db8::/32")
 
 	// The visitor's address has to be outside the trusted prefix, or it is one
@@ -112,6 +120,7 @@ func TestIPv6IsHandled(t *testing.T) {
 // Ports and brackets are transport detail; the limiter and the log want the
 // address.
 func TestThePortIsNotPartOfTheAddress(t *testing.T) {
+	t.Parallel()
 	r := resolver(t)
 
 	assert.Equal(t, "203.0.113.7", r.From(request(t, "203.0.113.7:44321", "")))
@@ -119,6 +128,7 @@ func TestThePortIsNotPartOfTheAddress(t *testing.T) {
 }
 
 func TestAnUnreadableRemoteAddrIsNotFatal(t *testing.T) {
+	t.Parallel()
 	r := resolver(t)
 
 	got := r.From(request(t, "garbage", ""))
@@ -127,6 +137,7 @@ func TestAnUnreadableRemoteAddrIsNotFatal(t *testing.T) {
 }
 
 func TestBadTrustedProxyConfigIsRefused(t *testing.T) {
+	t.Parallel()
 	for _, bad := range []string{"not-a-cidr", "10.0.0.0/99", "10.0.0.0/8, oops"} {
 		_, err := clientip.NewResolver([]string{bad})
 

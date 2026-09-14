@@ -168,6 +168,7 @@ func sender(addr string) smtp.Sender {
 // The contract every Mailer keeps, run against this one. A new adapter is one
 // call to this away from being held to the same standard.
 func TestTheSenderKeepsTheMailerContract(t *testing.T) {
+	t.Parallel()
 	mailertest.Contract(t, mailertest.Subject{
 		Provider: "smtp",
 		Working: func(t *testing.T) contact.Mailer {
@@ -194,6 +195,7 @@ func TestTheSenderKeepsTheMailerContract(t *testing.T) {
 // errors.New(err.Error()) would satisfy the contract and still leave a caller
 // with a sentence to parse instead of a 550.
 func TestARefusalKeepsTheServersOwnReplyReachable(t *testing.T) {
+	t.Parallel()
 	addr, _ := stubSMTP(t, refuseRecipient)
 
 	err := sender(addr).Send(context.Background(), contact.Message{
@@ -209,6 +211,7 @@ func TestARefusalKeepsTheServersOwnReplyReachable(t *testing.T) {
 // bridge restarted, the container is not up yet — and it has to arrive as the
 // same shape of error as a refusal does.
 func TestAnUnreachableServerIsReportedAsDial(t *testing.T) {
+	t.Parallel()
 	err := sender("127.0.0.1:1").Send(context.Background(), contact.Message{
 		Name: "Ada", Email: "ada@example.com", Subject: "s", Body: "b",
 	})
@@ -222,6 +225,7 @@ func TestAnUnreachableServerIsReportedAsDial(t *testing.T) {
 // from. Sending as them fails SPF for their domain and files the whole thing as
 // spam. Same rule the Mailgun adapter follows.
 func TestTheVisitorIsTheReplyToNotTheSender(t *testing.T) {
+	t.Parallel()
 	addr, delivered := stubSMTP(t, acceptEverything)
 
 	require.NoError(t, sender(addr).Send(context.Background(), contact.Message{
@@ -240,6 +244,7 @@ func TestTheVisitorIsTheReplyToNotTheSender(t *testing.T) {
 // What must not survive is the line break, because that is the character that
 // turns the rest of the string into a header of its own.
 func TestAHeaderCannotBeSmuggledIntoTheSubject(t *testing.T) {
+	t.Parallel()
 	addr, delivered := stubSMTP(t, acceptEverything)
 
 	require.NoError(t, sender(addr).Send(context.Background(), contact.Message{
@@ -257,6 +262,7 @@ func TestAHeaderCannotBeSmuggledIntoTheSubject(t *testing.T) {
 // their domain and file the message as spam, so it carries ours in both
 // directions and the visitor appears only in Reply-To.
 func TestTheEnvelopeCarriesOurAddressesNotTheVisitors(t *testing.T) {
+	t.Parallel()
 	addr, delivered := stubSMTP(t, acceptEverything)
 
 	require.NoError(t, sender(addr).Send(context.Background(), contact.Message{
@@ -272,6 +278,7 @@ func TestTheEnvelopeCarriesOurAddressesNotTheVisitors(t *testing.T) {
 // SMTP ends a message with a lone dot on its own line. A body containing one
 // would otherwise cut the mail short and leave the rest to be read as commands.
 func TestALoneDotInTheBodyDoesNotEndTheMessage(t *testing.T) {
+	t.Parallel()
 	addr, delivered := stubSMTP(t, acceptEverything)
 
 	require.NoError(t, sender(addr).Send(context.Background(), contact.Message{

@@ -72,6 +72,12 @@ func testConfig(marketingSMTP, careersSMTP string) config.Config {
 	}
 }
 
+// None of the tests below call t.Parallel(). In CI, startMailpit points every
+// test at the same shared Mailpit instance (see its own comment) and empties
+// it first — two of these running at once would delete or double-count each
+// other's messages. TestHealthzAnswersWithoutTouchingSMTP is the one exception:
+// it never touches Mailpit at all.
+
 // The whole point of per-form SMTP: each form's mail leaves through its own
 // server, so a message posted at one form cannot turn up on the other's.
 func TestEachFormSendsThroughItsOwnServer(t *testing.T) {
@@ -204,6 +210,7 @@ func TestHoneypotIsAcceptedButNotDelivered(t *testing.T) {
 }
 
 func TestHealthzAnswersWithoutTouchingSMTP(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	srv := start(t, testConfig("127.0.0.1:1", "127.0.0.1:1"))
 

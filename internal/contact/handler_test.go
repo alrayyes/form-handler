@@ -47,6 +47,7 @@ func newHandler(t *testing.T, m contact.Mailer, perHour int) *contact.Handler {
 }
 
 func TestPostSendsTheMessage(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
@@ -56,6 +57,7 @@ func TestPostSendsTheMessage(t *testing.T) {
 }
 
 func TestOriginsOtherThanOursAreRefused(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, "https://someone-else.example")
@@ -67,6 +69,7 @@ func TestOriginsOtherThanOursAreRefused(t *testing.T) {
 }
 
 func TestPreflightIsAnswered(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodOptions, "/contact", nil)
 	req.Header.Set("Origin", origin)
 	res := httptest.NewRecorder()
@@ -78,6 +81,7 @@ func TestPreflightIsAnswered(t *testing.T) {
 }
 
 func TestHoneypotLooksExactlyLikeSuccess(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	body := `{"name":"Bot","email":"bot@example.com","message":"Cheap watches for sale.","website":"http://spam.example"}`
 
@@ -90,6 +94,7 @@ func TestHoneypotLooksExactlyLikeSuccess(t *testing.T) {
 }
 
 func TestValidationErrorNamesTheField(t *testing.T) {
+	t.Parallel()
 	res := post(t, newHandler(t, mailertest.NewFake(), 100), `{"name":"","email":"ada@example.com","message":"long enough to pass"}`, origin)
 
 	require.Equal(t, http.StatusUnprocessableEntity, res.Code)
@@ -97,12 +102,14 @@ func TestValidationErrorNamesTheField(t *testing.T) {
 }
 
 func TestUnknownFieldsAreRejected(t *testing.T) {
+	t.Parallel()
 	res := post(t, newHandler(t, mailertest.NewFake(), 100), `{"name":"Ada","email":"ada@example.com","message":"long enough here","admin":true}`, origin)
 
 	require.Equal(t, http.StatusBadRequest, res.Code)
 }
 
 func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	h := newHandler(t, mailer, 2)
 
@@ -126,6 +133,7 @@ func TestRateLimitStopsRepeatedSubmissions(t *testing.T) {
 // CORS headers and the JSON decoder in ServeHTTP, where nobody rearranging that
 // function would think to look for it.
 func TestARefusedOriginDoesNotConsumeTheRateLimit(t *testing.T) {
+	t.Parallel()
 	h := newHandler(t, mailertest.NewFake(), 1)
 	refused := post(t, h, goodBody, "https://someone-else.example")
 	require.Equal(t, http.StatusForbidden, refused.Code, "the setup did not refuse the origin")
@@ -136,6 +144,7 @@ func TestARefusedOriginDoesNotConsumeTheRateLimit(t *testing.T) {
 }
 
 func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake().Breaks(mailertest.ErrMailServerDown)
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
@@ -149,6 +158,7 @@ func TestSendFailureIsReportedNotSwallowed(t *testing.T) {
 // The subject is the form's, not the submission's: two forms on one service
 // word it differently, which is half of why they are separate forms.
 func TestTheFormsSubjectTemplateIsRendered(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	h, err := contact.NewHandler(contact.Form{
 		ID:      "careers",
@@ -165,6 +175,7 @@ func TestTheFormsSubjectTemplateIsRendered(t *testing.T) {
 }
 
 func TestAFormWithNoSubjectGetsTheDefault(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 
 	res := post(t, newHandler(t, mailer, 100), goodBody, origin)
@@ -177,6 +188,7 @@ func TestAFormWithNoSubjectGetsTheDefault(t *testing.T) {
 // The name reaches the subject line, and the name is whatever the visitor
 // typed. A newline in a header is how injection works.
 func TestSubjectCannotCarryAHeaderInjection(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	body := `{"name":"Ada\r\nBcc: everyone@example.com","email":"ada@example.com","message":"A message long enough to pass."}`
 
@@ -189,6 +201,7 @@ func TestSubjectCannotCarryAHeaderInjection(t *testing.T) {
 }
 
 func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
+	t.Parallel()
 	_, err := contact.NewHandler(contact.Form{
 		ID:      "broken",
 		Origins: []string{origin},
@@ -201,6 +214,7 @@ func TestABadSubjectTemplateIsRefusedAtStartup(t *testing.T) {
 // Fail closed. "Nobody is allowed" must not be read as "everybody is" — that
 // reading is how a contact form becomes an open relay for spam.
 func TestAFormWithNoOriginsAcceptsNothing(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	h, err := contact.NewHandler(contact.Form{ID: "misconfigured"},
 		mailer, ratelimit.New(100, time.Hour), slog.New(slog.DiscardHandler), clientip.Resolver{})
@@ -216,6 +230,7 @@ func TestAFormWithNoOriginsAcceptsNothing(t *testing.T) {
 // a service that believes it gives every caller a fresh rate-limit bucket per
 // request just by varying the header.
 func TestTheRateLimitCannotBeBypassedWithAForgedHeader(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	h := newHandler(t, mailer, 1)
 
@@ -231,6 +246,7 @@ func TestTheRateLimitCannotBeBypassedWithAForgedHeader(t *testing.T) {
 // And the reason it is read at all still works: a trusted proxy's header is
 // believed, so two real visitors behind one proxy are not one client.
 func TestBehindATrustedProxyVisitorsAreCountedSeparately(t *testing.T) {
+	t.Parallel()
 	mailer := mailertest.NewFake()
 	resolver, err := clientip.NewResolver([]string{"192.0.2.0/24"})
 	require.NoError(t, err)
@@ -263,6 +279,7 @@ func postAs(t *testing.T, h http.Handler, claimed string) *httptest.ResponseReco
 }
 
 func TestGetIsNotAllowed(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/contact", nil)
 	req.Header.Set("Origin", origin)
 	res := httptest.NewRecorder()

@@ -20,6 +20,7 @@ func valid() contact.Submission {
 }
 
 func TestValidateAcceptsAGoodSubmission(t *testing.T) {
+	t.Parallel()
 	msg, err := contact.Validate(valid())
 
 	require.NoError(t, err)
@@ -31,6 +32,7 @@ func TestValidateAcceptsAGoodSubmission(t *testing.T) {
 }
 
 func TestValidateTrimsBeforeMeasuring(t *testing.T) {
+	t.Parallel()
 	s := valid()
 	s.Name = "   "
 
@@ -42,6 +44,7 @@ func TestValidateTrimsBeforeMeasuring(t *testing.T) {
 }
 
 func TestValidateRejectsBadInput(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		mutate func(*contact.Submission)
 		field  string
@@ -60,6 +63,7 @@ func TestValidateRejectsBadInput(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			s := valid()
 			tc.mutate(&s)
 
@@ -73,6 +77,7 @@ func TestValidateRejectsBadInput(t *testing.T) {
 }
 
 func TestValidateCountsRunesNotBytes(t *testing.T) {
+	t.Parallel()
 	s := valid()
 	// 100 runes, well over 100 bytes. A byte count would reject a name that is
 	// exactly at the documented limit.
@@ -84,6 +89,7 @@ func TestValidateCountsRunesNotBytes(t *testing.T) {
 }
 
 func TestValidateCatchesTheHoneypot(t *testing.T) {
+	t.Parallel()
 	s := valid()
 	s.Website = "http://spam.example"
 
