@@ -1,0 +1,47 @@
+# commitlint checks each commit inside a pull request, but never the pull
+# request's own title — and this repo squash-merges, so GitHub defaults the
+# squash commit to that title. Three perfectly conventional commits and a
+# title reading "fixed stuff" would squash straight past commitlint and land
+# exactly that on master, where release-please reads it to decide the next
+# version.
+#
+# pull_request_target, not pull_request: this needs base-repo permissions to
+# validate a title on a pull request opened from a fork, and it never checks
+# out the pull request's own code — every step below only reads
+# github.event.pull_request.title.
+name: pr title
+
+on:
+  pull_request_target:
+    types: [opened, reopened, edited, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # comments on the pull request when the title fails
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        with:
+          # Mirrors @commitlint/config-conventional's own type list, so this
+          # and commitlint agree on what counts as a valid type.
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
