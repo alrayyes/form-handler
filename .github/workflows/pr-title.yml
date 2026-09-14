@@ -36,7 +36,11 @@ jobs:
           # Not passed as an input: the action reads it from the environment,
           # and without it every run fails outright with "Parameter token or
           # opts.auth is required" before it even looks at the title.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #
+          # RELEASE_TOKEN (the real-identity PAT already on this repo for
+          # release-please's own GITHUB_TOKEN anti-recursion wall), not
+          # GITHUB_TOKEN — same real-identity reasoning applies here.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           # Mirrors @commitlint/config-conventional's own type list, so this
           # and commitlint agree on what counts as a valid type.
