@@ -2,7 +2,16 @@
   "name": "form-handler-tooling",
   "private": true,
   "description": "Not a JavaScript project. This exists so commitlint can resolve the shared config it extends, which bunx alone cannot do, and so the Markdown tools are pinned like everything else.",
-  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "format:check": "prettier --check \"**/*.{md,yml,yaml}\"",
+    "lint:api": "redocly lint",
+    "lint:json": "biome check .",
+    "lint:md": "markdownlint-cli2",
+    "lint:mechanics": "./scripts/lint-mechanics.sh",
+    "lint:package-json": "sort-package-json --check package.json",
+    "lint:prose": "./scripts/lint-prose.sh",
+    "prepare": "lefthook install"
+  },
   "overrides": {
     "fast-uri": "4.1.4",
     "js-yaml": "5.4.1",
@@ -15,18 +24,11 @@
     "@redocly/cli": "2.52.0",
     "lefthook": "2.1.12",
     "markdownlint-cli2": "0.23.2",
-    "prettier": "3.9.6"
+    "prettier": "3.9.6",
+    "sort-package-json": "4.0.0"
   },
+  "packageManager": "bun@1.3.14",
   "trustedDependencies": [
     "lefthook"
-  ],
-  "scripts": {
-    "prepare": "lefthook install",
-    "format:check": "prettier --check \"**/*.{md,yml,yaml}\"",
-    "lint:md": "markdownlint-cli2",
-    "lint:json": "biome check .",
-    "lint:api": "redocly lint",
-    "lint:prose": "./scripts/lint-prose.sh",
-    "lint:mechanics": "./scripts/lint-mechanics.sh"
-  }
+  ]
 }
