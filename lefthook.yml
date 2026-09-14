@@ -10,6 +10,13 @@ pre-commit:
       run: gofmt -w {staged_files}
       stage_fixed: true
 
+    # go.mod's own canonicalizer — gofmt never touches it. No check-only flag
+    # exists for this half, so pre-push/CI re-run it and diff instead.
+    - name: go-mod-fmt
+      glob: "go.mod"
+      run: go mod edit -fmt go.mod
+      stage_fixed: true
+
     # Prettier decides the layout, markdownlint then judges what Prettier
     # produced. The other order has markdownlint fixing something Prettier is
     # about to overwrite.
@@ -107,6 +114,19 @@ pre-push:
 
     - name: govulncheck
       run: go tool govulncheck ./...
+
+    # -mod=readonly only fails a build on a missing require — it says nothing
+    # about a stale one tidy would remove, a non-canonical version string it
+    # would rewrite, or a go.sum entry for a module nothing imports anymore.
+    # -diff prints that drift and exits non-zero without touching the file.
+    - name: go-mod-tidy
+      run: go mod tidy -diff
+
+    # Catches go.mod formatting drift that slipped past pre-commit — a commit
+    # made with --no-verify, or go.mod edited by something other than a
+    # staged commit.
+    - name: go-mod-fmt
+      run: go mod edit -fmt go.mod && git diff --exit-code go.mod
 
     # These are `package.json` scripts rather than the commands spelled out,
     # because CI runs the same ones and a literal copied into two files drifts
