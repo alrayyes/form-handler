@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.10](https://github.com/alrayyes/form-handler/compare/v2.2.9...v2.2.10) (2026-09-14)
+
+
+### Bug Fixes
+
+* **ci:** pr title workflow needs GITHUB_TOKEN ([#133](https://github.com/alrayyes/form-handler/issues/133)) ([0fe593e](https://github.com/alrayyes/form-handler/commit/0fe593ecb21060e3c3a3e453595196d9ded89728))
+
 ## [2.2.9](https://github.com/alrayyes/form-handler/compare/v2.2.8...v2.2.9) (2026-09-14)
 
 
