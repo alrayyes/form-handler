@@ -33,3 +33,24 @@ body:
       description: >
         Including "nothing" — but if a second deployment or a proxy rule already
         solves it, that is worth knowing.
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: How to tell it's done
+      description: >
+        Three to five checkable rules, Given/When/Then. A command and the
+        output it should give, a response this should return, a field the
+        forms file should accept — not "works properly."
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: What else has to be true before this ships
+      description: >
+        Tests, docs, README — whatever else this touches. "Nothing else" is
+        a fine answer for a small change.
+    validations:
+      required: true
