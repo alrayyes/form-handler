@@ -16,6 +16,7 @@ import (
 // it is just a struct that happens to compile, and every test using it is
 // asserting against behaviour nothing in production shares.
 func TestTheFakeKeepsTheMailerContract(t *testing.T) {
+	t.Parallel()
 	// The real adapters cannot supply this — their failures come from a mail
 	// server — which is why the fake is the one that has to prove it wraps
 	// what it was given rather than rebuilding it.
@@ -30,6 +31,7 @@ func TestTheFakeKeepsTheMailerContract(t *testing.T) {
 }
 
 func TestTheFakeKeepsWhatItWasSent(t *testing.T) {
+	t.Parallel()
 	f := mailertest.NewFake()
 	require.NoError(t, f.Send(context.Background(), contact.Message{Name: "Ada", Body: "hello"}))
 
@@ -43,6 +45,7 @@ func TestTheFakeKeepsWhatItWasSent(t *testing.T) {
 // driving sends another message should not race, and the race detector is what
 // says whether that is true.
 func TestSentIsSafeToReadWhileSending(t *testing.T) {
+	t.Parallel()
 	f := mailertest.NewFake()
 	done := make(chan struct{})
 
@@ -61,6 +64,7 @@ func TestSentIsSafeToReadWhileSending(t *testing.T) {
 }
 
 func TestABrokenFakeDeliversNothing(t *testing.T) {
+	t.Parallel()
 	f := mailertest.NewFake().Breaks(mailertest.ErrMailServerDown)
 
 	require.Error(t, f.Send(context.Background(), contact.Message{Name: "Ada"}))

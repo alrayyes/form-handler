@@ -109,6 +109,7 @@ type specCase struct {
 }
 
 func TestTheServiceAnswersAsTheSpecSays(t *testing.T) {
+	t.Parallel()
 	documented := loadSpec(t)
 
 	exercised := make(map[responseKey]bool, len(documented))
@@ -116,6 +117,7 @@ func TestTheServiceAnswersAsTheSpecSays(t *testing.T) {
 		exercised[c.responseKey] = true
 
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel()
 			want, ok := documented[c.responseKey]
 			require.Truef(t, ok, "the spec does not document %s", c)
 
@@ -250,6 +252,7 @@ var specCases = []specCase{{
 // it shares a rate limit proves it is the same handler and not a second one
 // that happens to behave alike today.
 func TestTheAliasIsTheDefaultFormItself(t *testing.T) {
+	t.Parallel()
 	mux, err := server.New(config.Config{
 		Forms: []config.Form{{
 			ID:               config.DefaultFormID,

@@ -60,6 +60,7 @@ type specRequestOperation struct {
 const submitPath = "/contact/{form}"
 
 func TestTheEndpointEnforcesTheRequestSchema(t *testing.T) {
+	t.Parallel()
 	doc := loadRequestDoc(t)
 	submission := requestSchema(t, doc)
 	invalid := resolveSchema(t, doc, specSchema{Ref: "#/components/schemas/ValidationError"})
@@ -69,17 +70,21 @@ func TestTheEndpointEnforcesTheRequestSchema(t *testing.T) {
 	// The generator has to produce something the service accepts, or every
 	// case below passes for the wrong reason.
 	t.Run("the spec's own example of a valid submission is accepted", func(t *testing.T) {
+		t.Parallel()
 		res := submit(t, validSubmission(t, submission))
 
 		require.Equal(t, http.StatusAccepted, res.Code, res.Body.String())
 	})
 
 	for _, field := range sortedKeys(submission.Properties) {
-		testFieldBounds(t, submission, invalid, field, submission.Properties[field])
+		prop := submission.Properties[field]
+		testFieldBounds(t, submission, invalid, field, prop)
+		testFieldFormat(t, submission, invalid, field, prop)
 	}
 
 	for _, field := range submission.Required {
 		t.Run(field+" is required, so leaving it out is refused", func(t *testing.T) {
+			t.Parallel()
 			body := validSubmission(t, submission)
 			delete(body, field)
 
@@ -90,6 +95,7 @@ func TestTheEndpointEnforcesTheRequestSchema(t *testing.T) {
 	}
 
 	t.Run("a field the spec does not describe is refused", func(t *testing.T) {
+		t.Parallel()
 		if submission.AdditionalProperties == nil || *submission.AdditionalProperties {
 			t.Skip("the spec allows properties it does not name, so there is nothing to enforce")
 		}
@@ -112,6 +118,7 @@ func testFieldBounds(t *testing.T, submission, invalid specSchema, field string,
 
 	if prop.MaxLength != nil {
 		t.Run(field+" at its documented maximum is accepted", func(t *testing.T) {
+			t.Parallel()
 			body := validSubmission(t, submission)
 			body[field] = valueOfLength(prop, *prop.MaxLength)
 
@@ -121,6 +128,7 @@ func testFieldBounds(t *testing.T, submission, invalid specSchema, field string,
 		})
 
 		t.Run(field+" past its documented maximum is refused", func(t *testing.T) {
+			t.Parallel()
 			body := validSubmission(t, submission)
 			body[field] = valueOfLength(prop, *prop.MaxLength+1)
 
@@ -132,6 +140,7 @@ func testFieldBounds(t *testing.T, submission, invalid specSchema, field string,
 
 	if prop.MinLength != nil && *prop.MinLength > 0 {
 		t.Run(field+" at its documented minimum is accepted", func(t *testing.T) {
+			t.Parallel()
 			// A length bound is not the only thing a property can ask for.
 			// email is minLength 1 and format email, and no one-character
 			// string satisfies both — the shortest value that passes is
@@ -150,6 +159,7 @@ func testFieldBounds(t *testing.T, submission, invalid specSchema, field string,
 		})
 
 		t.Run(field+" short of its documented minimum is refused", func(t *testing.T) {
+			t.Parallel()
 			body := validSubmission(t, submission)
 			body[field] = valueOfLength(prop, *prop.MinLength-1)
 
@@ -158,20 +168,30 @@ func testFieldBounds(t *testing.T, submission, invalid specSchema, field string,
 			assertRefusedField(t, invalid, res, field)
 		})
 	}
+}
 
-	if prop.Format != "" {
-		t.Run(field+" has to satisfy its documented format", func(t *testing.T) {
-			body := validSubmission(t, submission)
-			// Inside every length bound the spec states, and still not an
-			// address. Without this the format is the one keyword in the
-			// schema nothing holds the service to.
-			body[field] = malformed(prop)
+// testFieldFormat checks a property whose spec names a format — email, so
+// far — against a value that satisfies every length bound and still isn't
+// one.
+func testFieldFormat(t *testing.T, submission, invalid specSchema, field string, prop specSchema) {
+	t.Helper()
 
-			res := submit(t, body)
-
-			assertRefusedField(t, invalid, res, field)
-		})
+	if prop.Format == "" {
+		return
 	}
+
+	t.Run(field+" has to satisfy its documented format", func(t *testing.T) {
+		t.Parallel()
+		body := validSubmission(t, submission)
+		// Inside every length bound the spec states, and still not an
+		// address. Without this the format is the one keyword in the
+		// schema nothing holds the service to.
+		body[field] = malformed(prop)
+
+		res := submit(t, body)
+
+		assertRefusedField(t, invalid, res, field)
+	})
 }
 
 // assertRefusedField checks a refusal against what the spec says a refusal

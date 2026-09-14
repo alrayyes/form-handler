@@ -54,6 +54,7 @@ func capture(t *testing.T, perHour int) (*contact.Handler, func() []logged) {
 // "nothing in the logs" meant either that the service turned it away or that it
 // never arrived — and there was no way to tell which.
 func TestEveryRefusalIsLogged(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		method string
 		origin string
@@ -69,6 +70,7 @@ func TestEveryRefusalIsLogged(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			h, lines := capture(t, 100)
 
 			req := httptest.NewRequest(tc.method, "/contact/marketing", strings.NewReader(tc.body))
@@ -90,6 +92,7 @@ func TestEveryRefusalIsLogged(t *testing.T) {
 // The origin is the field that answers "was this us or something in front of
 // us", so it has to be in the line rather than inferred from the status.
 func TestARefusedOriginIsNamedInTheLog(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 100)
 
 	post(t, h, goodBody, "https://someone-else.example")
@@ -103,6 +106,7 @@ func TestARefusedOriginIsNamedInTheLog(t *testing.T) {
 }
 
 func TestRateLimitingIsLogged(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 1)
 
 	post(t, h, goodBody, origin)
@@ -117,6 +121,7 @@ func TestRateLimitingIsLogged(t *testing.T) {
 // Cloudflare stamps every request it forwards. Carrying it through is what lets
 // a line here be matched against Cloudflare's own log for the same request.
 func TestTheCloudflareRayIdIsCarriedThrough(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 100)
 
 	req := httptest.NewRequest(http.MethodPost, "/contact/marketing", strings.NewReader(goodBody))
@@ -132,6 +137,7 @@ func TestTheCloudflareRayIdIsCarriedThrough(t *testing.T) {
 
 // A header is whatever the sender put in it, and this one reaches a log line.
 func TestHeadersReachingTheLogAreBounded(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 100)
 
 	req := httptest.NewRequest(http.MethodPost, "/contact/marketing", strings.NewReader(goodBody))
@@ -152,6 +158,7 @@ func TestHeadersReachingTheLogAreBounded(t *testing.T) {
 // lets whoever sent it append what looks like another entry, so a refused
 // request can claim in the log that it succeeded.
 func TestARefusalCannotForgeASecondLogEntry(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 100)
 
 	req := httptest.NewRequest(http.MethodPost, "/contact/marketing", strings.NewReader(goodBody))
@@ -170,6 +177,7 @@ func TestARefusalCannotForgeASecondLogEntry(t *testing.T) {
 // X-Forwarded-For is set by whoever sent the request, so without checking it
 // the limiter is keyed on arbitrary strings and the log carries them.
 func TestAClientAddressIsAlwaysAnAddress(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 100)
 
 	req := httptest.NewRequest(http.MethodPost, "/contact/marketing", strings.NewReader(goodBody))
@@ -187,6 +195,7 @@ func TestAClientAddressIsAlwaysAnAddress(t *testing.T) {
 }
 
 func TestAcceptedSubmissionsAreStillLogged(t *testing.T) {
+	t.Parallel()
 	h, lines := capture(t, 100)
 
 	post(t, h, goodBody, origin)

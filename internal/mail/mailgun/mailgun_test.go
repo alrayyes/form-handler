@@ -85,6 +85,7 @@ const refused = `{"message":"Invalid private key"}`
 // tell which it is holding — it reads Provider and Op off a DeliveryError and
 // answers 502 either way.
 func TestTheSenderKeepsTheMailerContract(t *testing.T) {
+	t.Parallel()
 	mailertest.Contract(t, mailertest.Subject{
 		Provider: "mailgun",
 		Working: func(t *testing.T) contact.Mailer {
@@ -105,6 +106,7 @@ func TestTheSenderKeepsTheMailerContract(t *testing.T) {
 }
 
 func TestSendReachesMailgunAsThatDomain(t *testing.T) {
+	t.Parallel()
 	baseURL, got := stubMailgun(t, http.StatusOK, accepted)
 
 	sender, err := mailgun.New(mailgun.Config{
@@ -146,6 +148,7 @@ func TestSendReachesMailgunAsThatDomain(t *testing.T) {
 // The submitter's name and address belong in the body too, or whoever reads the
 // inbox has a message with no idea who sent it beyond a header.
 func TestSendCarriesWhoSubmittedItInTheBody(t *testing.T) {
+	t.Parallel()
 	baseURL, got := stubMailgun(t, http.StatusOK, accepted)
 
 	sender := mustSender(t, baseURL)
@@ -163,6 +166,7 @@ func TestSendCarriesWhoSubmittedItInTheBody(t *testing.T) {
 // A refused send must be reported, not swallowed. A form that says "thanks" and
 // drops the message is worse than one that says it failed.
 func TestARefusedSendIsAnError(t *testing.T) {
+	t.Parallel()
 	baseURL, _ := stubMailgun(t, http.StatusUnauthorized, refused)
 
 	sender := mustSender(t, baseURL)
@@ -186,6 +190,7 @@ func TestARefusedSendIsAnError(t *testing.T) {
 // has to replace and a wait. Wrapping has to leave that reachable, so the
 // SMTP adapter's textproto reply and this stay equally recoverable.
 func TestARefusalKeepsMailgunsOwnStatusReachable(t *testing.T) {
+	t.Parallel()
 	baseURL, _ := stubMailgun(t, http.StatusUnauthorized, refused)
 
 	err := mustSender(t, baseURL).Send(context.Background(), contact.Message{
@@ -198,6 +203,7 @@ func TestARefusalKeepsMailgunsOwnStatusReachable(t *testing.T) {
 }
 
 func TestConfigIsCheckedWhenTheSenderIsBuilt(t *testing.T) {
+	t.Parallel()
 	cases := map[string]mailgun.Config{
 		"no domain":  {APIKey: "k", From: "a@example.com", To: "b@example.com"},
 		"no api key": {Domain: "mg.example.com", From: "a@example.com", To: "b@example.com"},
@@ -207,6 +213,7 @@ func TestConfigIsCheckedWhenTheSenderIsBuilt(t *testing.T) {
 
 	for name, cfg := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			_, err := mailgun.New(cfg)
 
 			require.Error(t, err, "an unusable sender was built anyway")
@@ -218,6 +225,7 @@ func TestConfigIsCheckedWhenTheSenderIsBuilt(t *testing.T) {
 // a typo here is worth refusing at startup rather than on the first
 // submission.
 func TestAnUnknownRegionIsRefused(t *testing.T) {
+	t.Parallel()
 	_, err := mailgun.New(mailgun.Config{
 		Domain: "mg.example.com",
 		APIKey: "key-secret",
@@ -233,6 +241,7 @@ func TestAnUnknownRegionIsRefused(t *testing.T) {
 // handler tells the two apart by Op, and this is the only path that produces
 // "timeout" rather than "send".
 func TestATimeoutIsReportedAsSuchNotAsARefusal(t *testing.T) {
+	t.Parallel()
 	blocks := make(chan struct{})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

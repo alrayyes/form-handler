@@ -33,6 +33,7 @@ func run(t *testing.T, args ...string) (code int, stdout, stderr string) {
 }
 
 func TestVersionIsPrintedBare(t *testing.T) {
+	t.Parallel()
 	code, stdout, _ := run(t, "--version")
 
 	require.Zero(t, code)
@@ -45,6 +46,7 @@ func TestVersionIsPrintedBare(t *testing.T) {
 // The flags were parsed by the standard library before cobra, and `flag` treats
 // one dash and two alike. Anything already deployed asks for them this way.
 func TestLegacySingleDashFlagsStillWork(t *testing.T) {
+	t.Parallel()
 	code, stdout, _ := run(t, "-version")
 
 	require.Zero(t, code)
@@ -56,6 +58,9 @@ func TestLegacySingleDashFlagsStillWork(t *testing.T) {
 // "unknown shorthand flag: 'e' in -ealthcheck", so a container that has been
 // probing itself this way since before cobra goes unhealthy on upgrade while
 // the service behind it is answering perfectly well.
+//
+// Not parallel: the subtests call t.Setenv, which panics if the test (or an
+// ancestor) has called t.Parallel.
 func TestBothSpellingsOfHealthcheckProbeAServingProcess(t *testing.T) {
 	// The probe talks to the loopback on the port from ADDR, so the test has to
 	// put a real server on a real port rather than fake the call.
@@ -75,6 +80,8 @@ func TestBothSpellingsOfHealthcheckProbeAServingProcess(t *testing.T) {
 	}
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestHealthcheckFailsWhenNothingIsServing(t *testing.T) {
 	t.Setenv("ADDR", unreachableAddr(t))
 
@@ -85,6 +92,7 @@ func TestHealthcheckFailsWhenNothingIsServing(t *testing.T) {
 }
 
 func TestUnknownFlagIsRefused(t *testing.T) {
+	t.Parallel()
 	code, _, stderr := run(t, "--nonsense")
 
 	require.Equal(t, 1, code)
@@ -94,6 +102,7 @@ func TestUnknownFlagIsRefused(t *testing.T) {
 // Only the two documented flags are rewritten. Anything else keeps pflag's
 // meaning, rather than being promoted into a long flag nobody defined.
 func TestAnUnknownSingleDashFlagIsStillAnError(t *testing.T) {
+	t.Parallel()
 	code, _, stderr := run(t, "-nonsense")
 
 	require.Equal(t, 1, code)
@@ -102,6 +111,7 @@ func TestAnUnknownSingleDashFlagIsStillAnError(t *testing.T) {
 
 // It takes no arguments at all — everything else comes from the environment.
 func TestStrayArgumentsAreRefused(t *testing.T) {
+	t.Parallel()
 	code, _, stderr := run(t, "serve")
 
 	require.Equal(t, 1, code)
@@ -109,6 +119,7 @@ func TestStrayArgumentsAreRefused(t *testing.T) {
 }
 
 func TestHelpIsNotAnError(t *testing.T) {
+	t.Parallel()
 	code, stdout, _ := run(t, "--help")
 
 	require.Zero(t, code)

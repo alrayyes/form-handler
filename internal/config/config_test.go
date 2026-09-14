@@ -37,6 +37,7 @@ forms:
 `
 
 func TestParseReadsEveryForm(t *testing.T) {
+	t.Parallel()
 	forms, err := parse(t, twoForms)
 
 	require.NoError(t, err)
@@ -54,6 +55,7 @@ func TestParseReadsEveryForm(t *testing.T) {
 // An omitted rate limit is not "no rate limit". Zero is a value someone may
 // mean, so it has to be distinguishable from the field being absent.
 func TestAnOmittedRateLimitTakesTheDefault(t *testing.T) {
+	t.Parallel()
 	forms, err := parse(t, twoForms)
 
 	require.NoError(t, err)
@@ -61,6 +63,7 @@ func TestAnOmittedRateLimitTakesTheDefault(t *testing.T) {
 }
 
 func TestAnExplicitZeroRateLimitDisablesIt(t *testing.T) {
+	t.Parallel()
 	forms, err := parse(t, `
 forms:
   - id: open
@@ -75,6 +78,7 @@ forms:
 }
 
 func TestAnOmittedSubjectTakesTheDefault(t *testing.T) {
+	t.Parallel()
 	forms, err := parse(t, twoForms)
 
 	require.NoError(t, err)
@@ -174,8 +178,10 @@ forms:
 }
 
 func TestParseRejectsBadConfig(t *testing.T) {
+	t.Parallel()
 	for name, tc := range badConfigCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			_, err := parse(t, tc.yaml)
 
 			require.Error(t, err)
@@ -186,6 +192,9 @@ func TestParseRejectsBadConfig(t *testing.T) {
 
 // Mailgun gives every sending domain its own login, so the credentials are a
 // property of the form rather than of the service.
+//
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestEachFormCanHaveItsOwnLogin(t *testing.T) {
 	t.Setenv("MAILGUN_EXAMPLE_COM", "secret-for-com")
 	t.Setenv("MAILGUN_EXAMPLE_ORG", "secret-for-org")
@@ -230,6 +239,7 @@ forms:
 // The point of password_env: the forms file describes which secret to use
 // without being a file that holds secrets, so it can live next to the site.
 func TestAMissingPasswordVariableIsRefusedAtStartup(t *testing.T) {
+	t.Parallel()
 	_, err := parse(t, `
 forms:
   - id: marketing
@@ -245,6 +255,8 @@ forms:
 	assert.Contains(t, err.Error(), "MAILGUN_NOT_SET")
 }
 
+// Not parallel: the outer test's own t.Setenv panics if it (or a descendant)
+// has called t.Parallel.
 func TestSMTPConfigIsRejectedWhenItCannotWork(t *testing.T) {
 	t.Setenv("MAILGUN_EXAMPLE_COM", "secret")
 
@@ -282,6 +294,7 @@ forms:
 // A form that says nothing about SMTP still has to end up with somewhere to
 // send, or the service starts and then fails one submission at a time.
 func TestAFormWithNoSMTPBlockTakesTheDefaultServer(t *testing.T) {
+	t.Parallel()
 	forms, err := parse(t, twoForms)
 
 	require.NoError(t, err)
@@ -289,6 +302,8 @@ func TestAFormWithNoSMTPBlockTakesTheDefaultServer(t *testing.T) {
 	assert.Empty(t, forms[0].SMTP.Username, "a default server needs no login")
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestFormsFromEnvironmentBecomeTheDefaultForm(t *testing.T) {
 	t.Setenv("MAIL_FROM", "site@example.com")
 	t.Setenv("MAIL_TO", "info@example.com")
@@ -312,6 +327,9 @@ func TestFormsFromEnvironmentBecomeTheDefaultForm(t *testing.T) {
 
 // There is no sensible default for "who may post to this", and guessing one
 // wrong means an open relay for spam.
+//
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestLoadRequiresOriginsWhenConfiguredFromTheEnvironment(t *testing.T) {
 	t.Setenv("MAIL_FROM", "site@example.com")
 	t.Setenv("MAIL_TO", "info@example.com")
@@ -322,6 +340,8 @@ func TestLoadRequiresOriginsWhenConfiguredFromTheEnvironment(t *testing.T) {
 	assert.Contains(t, err.Error(), "ALLOWED_ORIGINS")
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestLoadRequiresTheMailAddresses(t *testing.T) {
 	t.Setenv("ALLOWED_ORIGINS", "https://www.example.com")
 
@@ -331,6 +351,8 @@ func TestLoadRequiresTheMailAddresses(t *testing.T) {
 	assert.Contains(t, err.Error(), "MAIL_FROM")
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestAFormsFileWinsOverTheEnvironmentForm(t *testing.T) {
 	path := writeTemp(t, twoForms)
 	t.Setenv("FORMS_FILE", path)
@@ -347,6 +369,8 @@ func TestAFormsFileWinsOverTheEnvironmentForm(t *testing.T) {
 	assert.Equal(t, "marketing", cfg.Forms[0].ID)
 }
 
+// Not parallel: t.Setenv panics if the test (or an ancestor) has called
+// t.Parallel.
 func TestAMissingFormsFileIsAnError(t *testing.T) {
 	t.Setenv("FORMS_FILE", "/nonexistent/forms.yaml")
 
