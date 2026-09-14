@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.11](https://github.com/alrayyes/form-handler/compare/v2.2.10...v2.2.11) (2026-09-14)
+
+
+### Bug Fixes
+
+* **lint:** gate go.mod formatting and tidiness ([#130](https://github.com/alrayyes/form-handler/issues/130)) ([87fb27b](https://github.com/alrayyes/form-handler/commit/87fb27bc8ed30b35e0692c8d594b16aeec0f267e))
+
 ## [2.2.10](https://github.com/alrayyes/form-handler/compare/v2.2.9...v2.2.10) (2026-09-14)
 
 
