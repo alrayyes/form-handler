@@ -9,22 +9,26 @@ whoever changes it.
 
 ## Getting set up
 
-- **Go 1.25 or newer.**
-- **Docker**, for the integration test and the container test — the first
-  starts a real mail server in a container, the second starts the actual
-  image `ko` builds.
+- **Go 1.25 or newer**, for running the service itself
+  (`go run ./cmd/form-handler`) and for an editor's own tooling.
+- **Docker**, for the integration test, the container test, and every Go hook
+  command. The first starts a real mail server in a container, the second
+  starts the actual image `ko` builds, and the rest — `gofmt`, `golangci-lint`,
+  `go test`, `go mod edit -fmt`, `go mod tidy`, `govulncheck` — run through a
+  pinned `golang` or `golangci-lint` image (`scripts/go-in-docker.sh`,
+  `scripts/golangci-lint-in-docker.sh`) rather than whatever your own machine's
+  package manager happens to have installed. A host's `go` and `golangci-lint`
+  update independently of each other and of these pins, and the two disagreeing
+  is a broken hook with nothing to fix in this repository.
 - **[ko](https://ko.build) v0.19.1**, for the container test — it builds the
   image the test runs. Install the version CI uses rather than whichever is
-  current, for the same reason as golangci-lint below.
+  current: when the two disagree, the hook passes and the pipeline fails, and
+  the reason is not obvious from the failure.
 - **[bun](https://bun.sh)** for the tooling that is not Go — commitlint,
   Prettier, markdownlint, Biome, the [Redocly](https://redocly.com/docs/cli)
   that lints the API description, and the [lefthook](https://lefthook.dev) that
   runs the git hooks. There is a `package.json`, but nothing here is
   JavaScript; it exists only so those tools resolve and stay pinned.
-- **[golangci-lint](https://golangci-lint.run) v2.12.2**, which the pre-push
-  hook runs from your `PATH` while CI runs it pinned. Install that version
-  rather than whichever is current: when the two disagree, the hook passes and
-  the pipeline fails, and the reason is not obvious from the failure.
 
 One command installs the linters and the git hooks:
 
