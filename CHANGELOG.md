@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.9](https://github.com/alrayyes/form-handler/compare/v2.2.8...v2.2.9) (2026-09-14)
+
+
+### Bug Fixes
+
+* **lint:** stop running golangci-lint at pre-commit ([#125](https://github.com/alrayyes/form-handler/issues/125)) ([a51b2b3](https://github.com/alrayyes/form-handler/commit/a51b2b324cdea933f068a3c26bffff237d7bad59))
+
 ## [2.2.8](https://github.com/alrayyes/form-handler/compare/v2.2.7...v2.2.8) (2026-09-11)
 
 
