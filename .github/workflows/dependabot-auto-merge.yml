@@ -10,6 +10,12 @@ on:
 permissions:
   contents: read
 
+# A push to a still-open Dependabot PR re-fires this before the last run
+# finished arming auto-merge - cancel the stale one rather than running both.
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   auto-merge:
     # pull_request_target runs with a write-capable token against the base
