@@ -10,12 +10,6 @@ pre-commit:
       run: gofmt -w {staged_files}
       stage_fixed: true
 
-    - name: golangci-lint
-      glob: "*.go"
-      # Same build tags CI uses, or the integration and container tests go
-      # unlinted here and fail there instead.
-      run: golangci-lint run --build-tags=integration,containertest ./...
-
     # Prettier decides the layout, markdownlint then judges what Prettier
     # produced. The other order has markdownlint fixing something Prettier is
     # about to overwrite.
@@ -94,6 +88,15 @@ pre-push:
   jobs:
     - name: test
       run: go test ./...
+
+    # golangci-lint type-checks whole packages through go/packages, so
+    # scoping it to staged files barely trims the run time — it costs the
+    # same whether it is paid once a push or on every commit. It belongs here,
+    # not in pre-commit, so that cost is paid once. Same build tags CI uses,
+    # or the integration and container tests go unlinted here and fail there
+    # instead.
+    - name: golangci-lint
+      run: golangci-lint run --build-tags=integration,containertest ./...
 
     - name: govulncheck
       run: go tool govulncheck ./...
