@@ -187,6 +187,10 @@ jobs:
         # Literally the same command the pre-push hook runs, not a copy of it.
         # `check` is format and lint together, reporting rather than writing.
         run: bun run lint:json
+      - name: sort-package-json
+        # Key order, not formatting — a manual edit to package.json can drift
+        # from canonical order without Biome ever noticing.
+        run: bun run lint:package-json
 
   # The API description is a contract, and this is the half of checking it that
   # the Go tests cannot do. `go test` proves the spec matches what the handler

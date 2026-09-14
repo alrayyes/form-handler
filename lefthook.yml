@@ -43,6 +43,13 @@ pre-commit:
         - "CHANGELOG.md"
       run: vale {staged_files}
 
+    # Key order, not formatting — Biome leaves that alone. Runs first so
+    # Biome is the one deciding the final layout, not the other way round.
+    - name: sort-package-json
+      glob: "package.json"
+      run: bunx sort-package-json {staged_files}
+      stage_fixed: true
+
     # Biome owns every file type it supports, which here is the JSON and
     # nothing else. It formats and lints in one pass, so this is both.
     - name: biome
@@ -112,6 +119,9 @@ pre-push:
 
     - name: biome
       run: bun run lint:json
+
+    - name: sort-package-json
+      run: bun run lint:package-json
 
     - name: redocly
       run: bun run lint:api
