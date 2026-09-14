@@ -49,6 +49,15 @@ jobs:
         # version already having a known CVE. This catches that separately
         # from whatever raised the dependency-bump PR in the first place.
         run: go tool govulncheck ./...
+      - name: go mod tidy
+        # -mod=readonly only fails a build on a missing require — it says
+        # nothing about a stale one tidy would remove, a non-canonical
+        # version string, or a go.sum entry for a module nothing imports.
+        run: go mod tidy -diff
+      - name: go mod fmt
+        # gofmt never touches go.mod; this is its own canonicalizer, with no
+        # check-only flag, so the fix runs and the diff is the gate.
+        run: go mod edit -fmt go.mod && git diff --exit-code go.mod
 
   test:
     runs-on: ubuntu-24.04
