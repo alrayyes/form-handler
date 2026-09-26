@@ -4,6 +4,13 @@
 #
 # Everything here is what the Dockerfile used to say, so the resulting image is
 # the same one by a different route.
+#
+# One thing ko genuinely cannot say: there's no HEALTHCHECK field in its config
+# schema at all, so the image built here carries none, even though /healthz
+# (internal/server/server.go) already exists and works. Known, accepted gap -
+# vps-docker's own homepage.siteMonitor already polls that endpoint externally,
+# and nothing there depends_on this service's docker-level health, so the loss
+# is real but small. Revisit only if that stops being true.
 
 # Distroless: no shell, no package manager, nothing to exec into if this is ever
 # reached from outside. The :nonroot variant sets the user, so the process does
