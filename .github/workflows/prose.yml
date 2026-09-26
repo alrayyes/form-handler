@@ -51,7 +51,7 @@ jobs:
       # git and nodejs ship in the image itself as of alrayyes/ltex-cli-plus#5 -
       # actions/checkout needs both, and this job was installing git separately
       # on top of the image on every run before that.
-      image: ghcr.io/alrayyes/ltex-cli-plus:18.7.0@sha256:00c30809802234d6c43b0ce0b295075bd0aff9c576aaba57433bc8baf314398c
+      image: ghcr.io/alrayyes/ltex-cli-plus:18.7.0@sha256:e585b21bd84494ed5edcd7fa2d7fab2d591f6dde01bf972578a380ef43a0ca0b
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
