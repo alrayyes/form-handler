@@ -44,3 +44,17 @@ jobs:
           # Squash, so a bump that took three pushes to go green still lands as
           # one commit whose message commitlint has already approved.
           gh pr merge --auto --squash "$PR_URL"
+
+      # CODEOWNERS (* @alrayyes) auto-requests a review on every pull request,
+      # Dependabot's included - it exists so a real PR always gets one without
+      # being asked, not to make this repo's fully-automated Dependabot flow
+      # look like it needs manual review too. The ruleset's
+      # required_approving_review_count is 0, so this was never a merge
+      # gate - just a stale review request sitting on a PR that already
+      # merges itself in a minute or two. Clearing it here removes the
+      # notification, not any actual permission.
+      - name: Clear the CODEOWNERS review request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr edit "$PR_URL" --remove-reviewer alrayyes
