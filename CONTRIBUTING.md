@@ -9,7 +9,7 @@ whoever changes it.
 
 ## Getting set up
 
-- **Go 1.25 or newer**, for running the service itself
+- **Go 1.26 or newer**, for running the service itself
   (`go run ./cmd/form-handler`) and for an editor's own tooling.
 - **Docker**, for the integration test, the container test, and every Go hook
   command. The first starts a real mail server in a container, the second
