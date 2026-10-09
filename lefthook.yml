@@ -67,24 +67,6 @@ pre-commit:
       run: bunx biome check --write {staged_files}
       stage_fixed: true
 
-    # Reads only, so it changes nothing to restage. Invoked bare rather than on
-    # {staged_files}: what gets linted is the `apis` list in redocly.yaml, and
-    # naming a path here is how the hook and CI end up checking different
-    # files. The glob only decides whether it is worth running at all.
-    - name: redocly
-      # Wider than the one file this repository has today. `api/*.yaml` missed
-      # a spec named .yml and missed one split across api/paths/, and a hook
-      # that silently does not run is worse than no hook — the failure surfaces
-      # at CI instead, after the push, which is the gap the hooks exist to
-      # close.
-      glob:
-        - "api/*.yaml"
-        - "api/*.yml"
-        - "api/**/*.yaml"
-        - "api/**/*.yml"
-        - "redocly.yaml"
-      run: bunx redocly lint
-
 commit-msg:
   jobs:
     # Resolved from node_modules rather than fetched by bunx: commitlint has to
@@ -149,6 +131,9 @@ pre-push:
     - name: sort-package-json
       run: bun run lint:package-json
 
+    # Redocly lints the `apis` list in redocly.yaml and takes no staged file
+    # list, so it runs here and in CI rather than at commit: at commit it
+    # would judge the working tree, not what the commit contains.
     - name: redocly
       run: bun run lint:api
 

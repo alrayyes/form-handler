@@ -81,9 +81,9 @@ generated. Two tests hold the service to it, and both fail in either direction:
   red.
 
 `redocly lint` checks the document is valid OpenAPI, from the same
-`package.json` script the hook and CI both run. That is the whole point of the
-arrangement: the status table in the README quietly went years missing three
-codes, because prose has no way of noticing.
+`package.json` script the pre-push hook and CI both run. That is the whole
+point of the arrangement: the status table in the README quietly went years
+missing three codes, because prose has no way of noticing.
 
 ## The shape of a change
 
@@ -230,9 +230,11 @@ stage: `gofmt` over the Go at commit, `golangci-lint` over the Go at push
 have made it any faster — the cost is the same whether it is paid once a
 push or on every commit), Prettier over the Markdown and the YAML and then
 markdownlint over the Markdown, Biome over the JSON, `redocly lint` over
-the API description, `go test` with the race detector, the integration
-test against a real Mailpit, a CodeQL pass, a `ko build` to prove the image
-still assembles, and the container test running that image for real.
+the API description (at push only: it reads the whole `apis` list, so at
+commit it would judge files the commit doesn't contain), `go test` with the
+race detector, the integration test against a real Mailpit, a CodeQL pass, a
+`ko build` to prove the image still assembles, and the container test running
+that image for real.
 
 Prose gets two more jobs of its own. `mechanics` runs ltex-cli-plus for grammar
 and spelling and fails the build, because those have a right answer. `style`
