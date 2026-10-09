@@ -15,6 +15,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
+	github.com/boumenot/gocover-cobertura v1.5.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
@@ -79,6 +80,7 @@ require (
 )
 
 tool (
+	github.com/boumenot/gocover-cobertura
 	golang.org/x/vuln/cmd/govulncheck
 	gotest.tools/gotestsum
 )
