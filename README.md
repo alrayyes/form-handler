@@ -24,7 +24,7 @@ without sharing an inbox, and neither can post to the other.
 
 ## Requirements
 
-- **Go 1.25 or newer**, or Docker if you would rather run the image.
+- **Go 1.26 or newer**, or Docker if you would rather run the image.
 - **An SMTP server** it may send through. In production that is a mail bridge on
   the same host; locally it is a throwaway container, below.
 - **A sending address the mail server will accept, and somewhere to deliver

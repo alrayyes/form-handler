@@ -18,8 +18,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-GO_VERSION=1.25.14
-GO_IMAGE_DIGEST=sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437
+GO_VERSION=1.26.9
+GO_IMAGE_DIGEST=sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
 
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$(pwd):/src" -w /src \

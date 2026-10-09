@@ -1,6 +1,6 @@
 module github.com/alrayyes/form-handler
 
-go 1.25.14
+go 1.26.9
 
 require (
 	github.com/mailgun/mailgun-go/v5 v5.19.3
