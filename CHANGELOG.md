@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.14](https://github.com/alrayyes/form-handler/compare/v2.2.13...v2.2.14) (2026-10-09)
+
+
+### Bug Fixes
+
+* **deps:** bump Go to 1.26.9 to clear the stdlib vulnerabilities ([4ecb237](https://github.com/alrayyes/form-handler/commit/4ecb2379e5428779f65f07133d47c4afc7c0f6f6))
+* **deps:** bump Go to 1.26.9 to clear the stdlib vulnerabilities ([a910d2e](https://github.com/alrayyes/form-handler/commit/a910d2e787eec40b0c24fbbc241eb1202f581a05))
+
 ## [2.2.13](https://github.com/alrayyes/form-handler/compare/v2.2.12...v2.2.13) (2026-09-26)
 
 
