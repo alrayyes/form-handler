@@ -426,6 +426,22 @@ digest cannot, which is the difference between knowing what is running and
 assuming it. `form-handler --version` inside the container tells you which release
 a digest is, so pinning a digest no longer means losing the version.
 
+## Reports
+
+Every push to `master` with a green pipeline publishes its reports:
+
+- [Test results][tests] (JUnit XML)
+- [Coverage][cov] (HTML)
+- [Coverage][cov-xml] (Cobertura XML, with the Go `coverage.out` beside it)
+
+[The index][index] lists them with the commit and date. Pull requests assemble
+the same files and publish nothing.
+
+[tests]: https://apis.ryankes.eu/form-handler/reports/tests/unit.xml
+[cov]: https://apis.ryankes.eu/form-handler/reports/coverage/
+[cov-xml]: https://apis.ryankes.eu/form-handler/reports/coverage/coverage.xml
+[index]: https://apis.ryankes.eu/form-handler/reports/
+
 ## Contributing
 
 Everything about working on this — how it is put together, how to run the

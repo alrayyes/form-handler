@@ -73,6 +73,15 @@ jobs:
         run: >-
           go tool gotestsum --junitfile junit.xml --
           -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Assemble the reports
+        # Runs on pull requests too, so a broken conversion fails here and
+        # not on master after the merge.
+        run: ./scripts/build-reports.sh site/reports
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reports
+          path: site/reports
+          retention-days: 1
       - name: Report coverage
         run: |
           go tool cover -func=coverage.out | tail -1 |
@@ -280,3 +289,52 @@ jobs:
           version: v0.19.1
       - name: go test -tags=containertest
         run: go test -race -tags=containertest ./...
+
+  # One Pages deployment per repo, so the reports ship from this workflow. It
+  # needs every job above that can fail, so a red run publishes nothing and the
+  # reports always describe a green commit. `commits` only runs on pull
+  # requests and is left out of needs. This job checks the assembled site on
+  # pull requests too; only `deploy` waits for master.
+  reports:
+    needs: [lint, test, integration, prose, json, api, image, container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: reports
+          path: site/reports
+      - name: Check the assembled reports
+        run: |
+          for f in index.html tests/unit.xml coverage/index.html coverage/coverage.xml coverage/coverage.out; do
+            test -s "site/reports/$f"
+          done
+          grep -q '<coverage ' site/reports/coverage/coverage.xml
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: reports
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: deployment
+      - name: Check the live coverage report
+        # The deploy succeeds whether or not the URL works, so fetch the real
+        # file. The retries cover the CDN catching up.
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          curl --fail --silent --show-error --location --retry 6 --retry-delay 10 \
+            --retry-all-errors --output coverage.xml "${PAGE_URL%/}/reports/coverage/coverage.xml"
+          grep -q '<coverage ' coverage.xml

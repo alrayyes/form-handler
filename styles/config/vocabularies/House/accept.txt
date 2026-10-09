@@ -63,3 +63,5 @@ preflights?
 [Cc]onfigs?
 formatters?
 superset
+Cobertura
+JUnit
