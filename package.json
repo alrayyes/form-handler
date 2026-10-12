@@ -21,8 +21,8 @@
     "@biomejs/biome": "2.5.15",
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
-    "@redocly/cli": "2.57.0",
-    "lefthook": "2.1.16",
+    "@redocly/cli": "2.62.0",
+    "lefthook": "2.2.1",
     "markdownlint-cli2": "0.23.3",
     "prettier": "3.9.9",
     "sort-package-json": "4.0.0"
