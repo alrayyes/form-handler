@@ -1,0 +1,55 @@
+# The scan half of rules/dependencies.md: audit master and keep one open "Dependency advisories"
+# issue that lists what's there. Daily for advisories published against pins that haven't
+# moved, on a lockfile push so a merged fix closes the ticket at once, and by hand. An audit
+# that errors (registry down) fails the job and leaves the ticket alone.
+name: advisory-scan
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  push:
+    branches: [master]
+    paths:
+      - package.json
+      - bun.lock
+      - go.mod
+      - go.sum
+      - "**/*.go"
+      - .github/workflows/advisory-scan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: advisory-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # Pinned to a main commit of alrayyes/advisory-scan until its first release; re-pin then.
+      - uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
+        with:
+          mode: scan
+          # Both audits always run, so one ecosystem's finding can't hide the other's.
+          # One command, one ticket: two scan steps sharing a title would close each
+          # other's issue.
+          command: |
+            status=0
+            bun audit || status=1
+            go tool govulncheck ./... || status=1
+            exit "${status}"
+          labels: dependencies

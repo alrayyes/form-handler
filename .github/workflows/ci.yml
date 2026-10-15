@@ -44,11 +44,6 @@ jobs:
         # golangci-lint's formatter reports rather than rewrites here; this is
         # the check that a file was committed unformatted.
         run: gofmt -l . | (! grep .)
-      - name: govulncheck
-        # Pinning stops a version drifting; it says nothing about the pinned
-        # version already having a known CVE. This catches that separately
-        # from whatever raised the dependency-bump PR in the first place.
-        run: go tool govulncheck ./...
       - name: go mod tidy
         # -mod=readonly only fails a build on a missing require — it says
         # nothing about a stale one tidy would remove, a non-canonical
@@ -58,6 +53,49 @@ jobs:
         # gofmt never touches go.mod; this is its own canonicalizer, with no
         # check-only flag, so the fix runs and the diff is the gate.
         run: go mod edit -fmt go.mod && git diff --exit-code go.mod
+
+  # Fails only on advisories this change adds over its base (rules/dependencies.md): bun.lock
+  # through bun audit, and Go through govulncheck, which reads the code as well as go.mod, so
+  # a change to a .go file can introduce a finding too. What is already on master is the scan's
+  # to track, in advisory-scan.yml, so a new advisory never turns an unrelated pull request red.
+  # The job always runs and reports, so it can be a required check; its steps run only when
+  # one of those files changed, and on a push to master.
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${EVENT}" != pull_request ] || git diff --name-only "${BASE}...HEAD" | grep -Eq '^(package\.json|bun\.lock|go\.mod|go\.sum)$|\.go$'; then
+            echo "deps=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changed.outputs.deps == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - if: steps.changed.outputs.deps == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # Pinned to a main commit of alrayyes/advisory-scan until its first release; re-pin then.
+      - if: steps.changed.outputs.deps == 'true'
+        uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
+        with:
+          mode: gate
+          # Both audits always run, so one ecosystem's finding can't hide the other's.
+          # One command, one ticket: two scan steps sharing a title would close each
+          # other's issue.
+          command: |
+            status=0
+            bun audit || status=1
+            go tool govulncheck ./... || status=1
+            exit "${status}"
 
   test:
     runs-on: ubuntu-24.04
