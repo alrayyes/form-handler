@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.15](https://github.com/alrayyes/form-handler/compare/v2.2.14...v2.2.15) (2026-10-15)
+
+
+### Bug Fixes
+
+* **ci:** run release-auto-merge when the autorelease label is added ([#163](https://github.com/alrayyes/form-handler/issues/163)) ([e5ae974](https://github.com/alrayyes/form-handler/commit/e5ae974b301d5bed8cbf13d4f94d59ad165b7f49)), closes [#162](https://github.com/alrayyes/form-handler/issues/162)
+
 ## [2.2.14](https://github.com/alrayyes/form-handler/compare/v2.2.13...v2.2.14) (2026-10-09)
 
 
