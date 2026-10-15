@@ -18,9 +18,20 @@
 # token - a GITHUB_TOKEN-authored merge commit is suppressed from
 # triggering further workflow runs, which would leave release.yml never
 # re-firing to actually cut the tag and build the artefacts.
+#
+# types explicitly includes labeled: release-please-action opens the pull
+# request and applies the autorelease: pending label as two separate API
+# calls, and the opened event's payload is a snapshot taken before the
+# second one lands. Relying on the default types (opened, synchronize,
+# reopened) alone meant the opened run saw no label and skipped, with no
+# event left to re-check it against. labeled re-fires this workflow once
+# the label actually lands. On any other label the job's if still gates on
+# autorelease: pending, and re-arming auto-merge is idempotent.
 name: release auto-merge
 
-on: pull_request
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 # release-please keeps exactly one release pull request open at a time, so
 # this only ever runs against that one branch — cancel a superseded run
