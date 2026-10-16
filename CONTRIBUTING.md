@@ -237,7 +237,7 @@ race detector, the integration test against a real Mailpit, a CodeQL pass, a
 that image for real.
 
 The dependency audit is CI's alone: `audit` runs `bun audit` and `govulncheck`
-when a pull request touches the manifests, the lockfile or Go code, and fails
+when a pull request touches the manifests, the lock file or Go code, and fails
 only on advisories that pull request adds. No hook runs it, because a hook
 can't compare against the base and would fail on advisories already on
 `master`. To check by hand, run `bun audit` and `go tool govulncheck ./...`.
