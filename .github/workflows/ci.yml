@@ -91,19 +91,21 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # One gate step per tool: a gate keeps no ticket, so there is no title to clash, and one
+      # tool's error can't be masked by another tool's advisory IDs (advisory-scan#8).
       # Pinned to a main commit of alrayyes/advisory-scan until its first release; re-pin then.
-      - if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
+      - name: bun audit
+        if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
         uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
         with:
           mode: gate
-          # Both audits always run, so one ecosystem's finding can't hide the other's.
-          # One command, one ticket: two scan steps sharing a title would close each
-          # other's issue.
-          command: |
-            status=0
-            bun audit || status=1
-            go tool govulncheck ./... || status=1
-            exit "${status}"
+          command: bun audit
+      - name: govulncheck
+        if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
+        uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
+        with:
+          mode: gate
+          command: go tool govulncheck ./...
 
   test:
     runs-on: ubuntu-24.04
