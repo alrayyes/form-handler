@@ -93,16 +93,15 @@ jobs:
           go-version-file: go.mod
       # One gate step per tool: a gate keeps no ticket, so there is no title to clash, and one
       # tool's error can't be masked by another tool's advisory IDs (advisory-scan#8).
-      # Pinned to a main commit of alrayyes/advisory-scan until its first release; re-pin then.
       - name: bun audit
         if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
-        uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
+        uses: alrayyes/advisory-scan@9801551dad16ce63853b2babfda885365d368232 # v0.3.0
         with:
           mode: gate
           command: bun audit
       - name: govulncheck
         if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
-        uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
+        uses: alrayyes/advisory-scan@9801551dad16ce63853b2babfda885365d368232 # v0.3.0
         with:
           mode: gate
           command: go tool govulncheck ./...
