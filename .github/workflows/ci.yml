@@ -71,20 +71,28 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
+        # The file list goes in a variable first, so a git diff that errors (a missing base
+        # SHA) stops the step under bash -e instead of reading as "nothing changed".
         run: |
-          if [ "${EVENT}" != pull_request ] || git diff --name-only "${BASE}...HEAD" | grep -Eq '^(package\.json|bun\.lock|go\.mod|go\.sum)$|\.go$'; then
+          if [ "${EVENT}" != pull_request ]; then
+            echo "deps=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "${BASE}...HEAD")
+          if grep -Eq '^(package\.json|bun\.lock|go\.mod|go\.sum)$|\.go$' <<< "${files}"; then
             echo "deps=true" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.changed.outputs.deps == 'true'
+      # A failed changes step runs the gate rather than skipping it.
+      - if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
-      - if: steps.changed.outputs.deps == 'true'
+      - if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       # Pinned to a main commit of alrayyes/advisory-scan until its first release; re-pin then.
-      - if: steps.changed.outputs.deps == 'true'
+      - if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
         uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
         with:
           mode: gate
