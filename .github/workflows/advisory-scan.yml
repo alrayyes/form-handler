@@ -44,12 +44,30 @@ jobs:
       - uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
         with:
           mode: scan
-          # Both audits always run, so one ecosystem's finding can't hide the other's.
-          # One command, one ticket: two scan steps sharing a title would close each
-          # other's issue.
+          # One scan step, one ticket (two steps sharing a title would close each other's
+          # issue), so the tools share a wrapper. It buffers each tool's output and prints it
+          # only when every tool either passed or named an advisory. A tool that fails without
+          # naming one (registry down) fails the step with no IDs in the log, so another tool's
+          # findings can't mask it and the ticket stays as it was. advisory-scan#8 (one audit
+          # per tool in the action) will replace this wrapper.
           command: |
+            ids='GHSA(-[0-9a-z]{4}){3}|GO-[0-9]{4}-[0-9]+|CVE-[0-9]{4}-[0-9]+|PYSEC-[0-9]{4}-[0-9]+'
+            dir=$(mktemp -d)
             status=0
-            bun audit || status=1
-            go tool govulncheck ./... || status=1
+            i=0
+            for tool in 'bun audit' 'go tool govulncheck ./...'; do
+              i=$((i + 1))
+              rc=0
+              bash -c "${tool}" > "${dir}/${i}" 2>&1 || rc=$?
+              if [ "${rc}" -ne 0 ]; then
+                status=1
+                if ! grep -Eq "${ids}" "${dir}/${i}"; then
+                  echo "::error::${tool} failed without naming an advisory"
+                  cat "${dir}/${i}"
+                  exit 1
+                fi
+              fi
+            done
+            cat "${dir}"/*
             exit "${status}"
           labels: dependencies
