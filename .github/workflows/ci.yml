@@ -79,7 +79,7 @@ jobs:
             exit 0
           fi
           files=$(git diff --name-only "${BASE}...HEAD")
-          if grep -Eq '^(package\.json|bun\.lock|go\.mod|go\.sum)$|\.go$' <<< "${files}"; then
+          if grep -Eq '^(package\.json|bun\.lock|go\.mod|go\.sum|\.github/workflows/ci\.yml)$|\.go$' <<< "${files}"; then
             echo "deps=true" >> "$GITHUB_OUTPUT"
           fi
       # A failed changes step runs the gate rather than skipping it.
