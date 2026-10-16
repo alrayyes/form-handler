@@ -100,9 +100,6 @@ pre-push:
     - name: golangci-lint
       run: ./scripts/golangci-lint-in-docker.sh 'golangci-lint run --build-tags=integration,containertest ./...'
 
-    - name: govulncheck
-      run: ./scripts/go-in-docker.sh 'go tool govulncheck ./...'
-
     # -mod=readonly only fails a build on a missing require — it says nothing
     # about a stale one tidy would remove, a non-canonical version string it
     # would rewrite, or a go.sum entry for a module nothing imports anymore.

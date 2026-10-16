@@ -1,0 +1,73 @@
+# The scan half of rules/dependencies.md: audit master and keep one open "Dependency advisories"
+# issue that lists what's there. Daily for advisories published against pins that haven't
+# moved, on a lockfile push so a merged fix closes the ticket at once, and by hand. An audit
+# that errors (registry down) fails the job and leaves the ticket alone.
+name: advisory-scan
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  push:
+    branches: [master]
+    paths:
+      - package.json
+      - bun.lock
+      - go.mod
+      - go.sum
+      - "**/*.go"
+      - .github/workflows/advisory-scan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: advisory-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # Pinned to a main commit of alrayyes/advisory-scan until its first release; re-pin then.
+      - uses: alrayyes/advisory-scan@425418a63e80eb10142fbd2e82127b7ef3a51d68
+        with:
+          mode: scan
+          # One scan step, one ticket (two steps sharing a title would close each other's
+          # issue), so the tools share a wrapper. It buffers each tool's output and prints it
+          # only when every tool either passed or named an advisory. A tool that fails without
+          # naming one (registry down) fails the step with no IDs in the log, so another tool's
+          # findings can't mask it and the ticket stays as it was. advisory-scan#8 (one audit
+          # per tool in the action) will replace this wrapper.
+          command: |
+            ids='GHSA(-[0-9a-z]{4}){3}|GO-[0-9]{4}-[0-9]+|CVE-[0-9]{4}-[0-9]+|PYSEC-[0-9]{4}-[0-9]+'
+            dir=$(mktemp -d)
+            status=0
+            i=0
+            for tool in 'bun audit' 'go tool govulncheck ./...'; do
+              i=$((i + 1))
+              rc=0
+              bash -c "${tool}" > "${dir}/${i}" 2>&1 || rc=$?
+              if [ "${rc}" -ne 0 ]; then
+                status=1
+                if ! grep -Eq "${ids}" "${dir}/${i}"; then
+                  echo "::error::${tool} failed without naming an advisory"
+                  cat "${dir}/${i}"
+                  exit 1
+                fi
+              fi
+            done
+            cat "${dir}"/*
+            exit "${status}"
+          labels: dependencies
