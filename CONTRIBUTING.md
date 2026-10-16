@@ -14,7 +14,7 @@ whoever changes it.
 - **Docker**, for the integration test, the container test, and every Go hook
   command. The first starts a real mail server in a container, the second
   starts the actual image `ko` builds, and the rest — `gofmt`, `golangci-lint`,
-  `go test`, `go mod edit -fmt`, `go mod tidy`, `govulncheck` — run through a
+  `go test`, `go mod edit -fmt`, `go mod tidy` — run through a
   pinned `golang` or `golangci-lint` image (`scripts/go-in-docker.sh`,
   `scripts/golangci-lint-in-docker.sh`) rather than whatever your own machine's
   package manager happens to have installed. A host's `go` and `golangci-lint`
@@ -235,6 +235,12 @@ commit it would judge files the commit doesn't contain), `go test` with the
 race detector, the integration test against a real Mailpit, a CodeQL pass, a
 `ko build` to prove the image still assembles, and the container test running
 that image for real.
+
+The dependency audit is CI's alone: `audit` runs `bun audit` and `govulncheck`
+when a pull request touches the manifests, the lockfile or Go code, and fails
+only on advisories that pull request adds. No hook runs it, because a hook
+can't compare against the base and would fail on advisories already on
+`master`. To check by hand, run `bun audit` and `go tool govulncheck ./...`.
 
 Prose gets two more jobs of its own. `mechanics` runs ltex-cli-plus for grammar
 and spelling and fails the build, because those have a right answer. `style`
