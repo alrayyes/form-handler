@@ -95,13 +95,13 @@ jobs:
       # tool's error can't be masked by another tool's advisory IDs (advisory-scan#8).
       - name: bun audit
         if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
-        uses: alrayyes/advisory-scan@9801551dad16ce63853b2babfda885365d368232 # v0.3.0
+        uses: alrayyes/advisory-scan@c9f794de4354b870e159510f036779baf20f4a2f # v0.3.1
         with:
           mode: gate
           command: bun audit
       - name: govulncheck
         if: ${{ !cancelled() && (steps.changed.outcome == 'failure' || steps.changed.outputs.deps == 'true') }}
-        uses: alrayyes/advisory-scan@9801551dad16ce63853b2babfda885365d368232 # v0.3.0
+        uses: alrayyes/advisory-scan@c9f794de4354b870e159510f036779baf20f4a2f # v0.3.1
         with:
           mode: gate
           command: go tool govulncheck ./...
