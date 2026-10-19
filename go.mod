@@ -3,7 +3,7 @@ module github.com/alrayyes/form-handler
 go 1.26.9
 
 require (
-	github.com/mailgun/mailgun-go/v5 v5.19.3
+	github.com/mailgun/mailgun-go/v5 v5.19.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
