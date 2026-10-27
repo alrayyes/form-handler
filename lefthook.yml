@@ -5,6 +5,10 @@
 # commit should not fail over a quote style a tool can settle by itself.
 pre-commit:
   jobs:
+    # The index, not the working tree: what the commit would contain.
+    - name: gitleaks
+      run: gitleaks git --staged --redact --no-banner
+
     # Through the pinned golang image (scripts/go-in-docker.sh), not the host
     # gofmt: a host toolchain can drift from what golangci-lint's own image
     # type-checks against, independently and silently.
@@ -85,6 +89,11 @@ commit-msg:
 pre-push:
   parallel: true
   jobs:
+    # The whole history rather than the unpushed range: it takes well under a
+    # second at this size, and CI does the same (rules/secrets.md).
+    - name: gitleaks
+      run: gitleaks git --redact --no-banner
+
     - name: test
       run: ./scripts/go-in-docker.sh 'go test ./...'
 
