@@ -25,6 +25,7 @@
       "distroless",
       "entrypoint",
       "fixups",
+      "gitleaks",
       "golangci",
       "golangci-lint",
       "goreleaser",
