@@ -144,7 +144,7 @@ runs both.
 
 The container test, in `cmd/form-handler/container_test.go`, is a third and
 thinner tier. Everything above proves the Go code works and never touches the
-compiled binary — there is no Dockerfile, `ko` assembles the image
+compiled binary — the shipped image has no Dockerfile, `ko` assembles it
 (`.ko.yaml`), and this is the one test that runs it: builds it, starts it,
 posts a real request, and runs `--healthcheck` against the real distroless
 binary. It doesn't re-prove routing or header handling; the outer integration

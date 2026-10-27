@@ -403,12 +403,13 @@ on every release, for `linux/amd64` and `linux/arm64`, tagged with the version
 and with `latest`. A branch build runs too, but stops after building — enough to
 prove the image still builds before you merge, without publishing anything.
 
-There is no Dockerfile. The image is assembled by [ko](https://ko.build), which
-compiles the binary and writes the layers itself over the registry API. That
-started as a workaround for a runner that would allow neither a Docker daemon nor
-`unshare(CLONE_NEWUSER)`, and stayed because it is faster and needs no qemu to
-build both architectures. What a Dockerfile would say now lives in `.ko.yaml`:
-the same distroless base, still pinned by digest rather than following the tag.
+There is no Dockerfile for the image. It is assembled by [ko](https://ko.build),
+which compiles the binary and writes the layers itself over the registry API.
+That started as a workaround for a runner that would allow neither a Docker
+daemon nor `unshare(CLONE_NEWUSER)`, and stayed because it is faster and needs
+no qemu to build both architectures. What a Dockerfile would say now lives in
+`.ko.yaml`: the same distroless base, still pinned by digest rather than
+following the tag.
 
 To build it yourself:
 
