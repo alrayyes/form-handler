@@ -6,6 +6,8 @@
 # Two pins Dependabot cannot see, and which are updated by hand: the distroless
 # base image in .ko.yaml, and the Mailpit image the integration test uses. Both
 # are digest-pinned and neither lives anywhere Dependabot's ecosystems look.
+# The gitleaks image is tracked through the stub Dockerfile in .github/gitleaks/,
+# which gitleaks.yml builds; image-pins.yml still checks its digest.
 version: 2
 
 updates:
@@ -64,3 +66,27 @@ updates:
       tooling:
         patterns: ["*"]
         update-types: [minor, patch]
+
+  # The stub Dockerfile that pins gitleaks for .github/workflows/gitleaks.yml.
+  # Dependabot doesn't read a workflow's `container:`, so the pin lives here.
+  # ci: because it changes the pipeline, not what ships.
+  - package-ecosystem: docker
+    directory: /.github/gitleaks
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Amsterdam
+    commit-message:
+      prefix: ci
+      include: scope
+    # A group, even of one, keeps a bump on Dependabot's lowercase group-title
+    # template instead of the sentence-case single-update one, which fails
+    # commitlint's subject-case rule.
+    groups:
+      gitleaks:
+        patterns: ["*"]
+        update-types: [minor, patch]
+      gitleaks-major:
+        patterns: ["*"]
+        update-types: [major]

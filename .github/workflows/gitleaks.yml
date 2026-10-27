@@ -1,0 +1,43 @@
+# Deliberately ungated: a secret can be committed to any file, so there is no
+# diff this is safe to skip for. No `paths:` filter, unlike prose.yml.
+name: gitleaks
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # fetch-depth: 0, or there is no history to walk and the job passes
+      # having scanned nothing.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # The version lives in .github/gitleaks/Dockerfile, pinned by tag and
+      # digest, because Dependabot reads Dockerfiles and not a workflow's
+      # `container:`. Building it here keeps that file the only place to bump.
+      - name: Build the pinned gitleaks image
+        run: docker build --tag gitleaks .github/gitleaks
+      # The history is small, so scan all of it every time (rules/secrets.md).
+      # The image's entrypoint is gitleaks. safe.directory is set through the
+      # environment because the checkout is owned by the runner user, not the
+      # container's.
+      - name: Scan history
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/repo" --workdir /repo \
+            --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0=/repo \
+            gitleaks git --redact --no-banner .
