@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.17](https://github.com/alrayyes/form-handler/compare/v2.2.16...v2.2.17) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/mailgun/mailgun-go/v5 ([#175](https://github.com/alrayyes/form-handler/issues/175)) ([e145cde](https://github.com/alrayyes/form-handler/commit/e145cded8457021e036580a974bf223c80cef41a))
+
 ## [2.2.16](https://github.com/alrayyes/form-handler/compare/v2.2.15...v2.2.16) (2026-10-16)
 
 
