@@ -4,8 +4,9 @@
 #
 # The pins are spread across a Go constant, a ko config and a workflow's service
 # containers, which is exactly why nothing watched them: Dependabot's docker
-# ecosystem reads Dockerfiles and Kubernetes manifests, and there is no
-# Dockerfile here at all — ko assembles the image itself.
+# ecosystem reads Dockerfiles and Kubernetes manifests, and the root has no
+# Dockerfile — ko assembles the image itself. The stub in .github/gitleaks/ is
+# Dependabot's, so it is excluded below rather than reported twice.
 #
 # Writes a Markdown report to stdout. Exits 0 when everything matches, 1 when
 # something has moved, 2 when a digest could not be resolved.
@@ -19,7 +20,7 @@ set -uo pipefail
 # name:tag@sha256:… anywhere in a tracked file. One pattern covers the ko base
 # image, the workflow services and the Go constant alike.
 readonly PATTERN='[A-Za-z0-9][A-Za-z0-9._/-]*:[A-Za-z0-9][A-Za-z0-9._-]*@sha256:[a-f0-9]{64}'
-readonly EXCLUDES=(':!*.md' ':!.github/scripts/*')
+readonly EXCLUDES=(':!*.md' ':!.github/scripts/*' ':!.github/gitleaks/*')
 
 short() { printf '%s…' "${1:0:19}"; }
 

@@ -15,6 +15,7 @@ Renovate
 Traefik
 [Gg]oreleaser
 golangci-lint
+gitleaks
 lefthook
 markdownlint
 commitlint

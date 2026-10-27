@@ -30,6 +30,12 @@ whoever changes it.
   runs the git hooks. There is a `package.json`, but nothing here is
   JavaScript; it exists only so those tools resolve and stay pinned.
 
+- **[gitleaks](https://github.com/gitleaks/gitleaks)** on your `PATH`, for the
+  secret scan. The pre-commit hook scans the staged changes and the pre-push
+  hook scans the whole history. CI does the same on every pull request and
+  every push to `master`, and is never path-filtered. It runs a pinned image,
+  so a newer local gitleaks can find things CI does not, and the reverse.
+
 One command installs the linters and the git hooks:
 
 ```sh
@@ -138,7 +144,7 @@ runs both.
 
 The container test, in `cmd/form-handler/container_test.go`, is a third and
 thinner tier. Everything above proves the Go code works and never touches the
-compiled binary — there is no Dockerfile, `ko` assembles the image
+compiled binary — the shipped image has no Dockerfile, `ko` assembles it
 (`.ko.yaml`), and this is the one test that runs it: builds it, starts it,
 posts a real request, and runs `--healthcheck` against the real distroless
 binary. It doesn't re-prove routing or header handling; the outer integration
@@ -236,6 +242,15 @@ race detector, the integration test against a real Mailpit, a CodeQL pass, a
 `ko build` to prove the image still assembles, and the container test running
 that image for real.
 
+Secret scanning is its own workflow, `gitleaks`, and the one that is never
+skipped: no path filter, so a docs-only pull request is scanned like any other.
+It builds the stub `Dockerfile` in `.github/gitleaks/`, which pins the image by
+tag and digest and exists so Dependabot can bump it, then scans the whole
+history with `--redact` so a finding never reaches the log. The config is
+`.gitleaks.toml`, which extends the upstream defaults. If a scan finds
+something, treat it as leaked: revoke and rotate the credential before you do
+anything to the history.
+
 The dependency audit is CI's alone: `audit` runs `bun audit` and `govulncheck`
 when a pull request touches the manifests, the lock file or Go code, and fails
 only on advisories that pull request adds. No hook runs it, because a hook
@@ -317,10 +332,11 @@ Actions → General), or release-please has nowhere to put the release. And the
 release pull request passes the same required checks as any other before anyone
 can merge it.
 
-Dependency updates come from Dependabot — Go modules, the actions, and the
-JavaScript tooling, grouped weekly — and merge themselves once every required
-check is green. Two pins it cannot see are updated by hand: the distroless base
-in `.ko.yaml` and the Mailpit image the integration test uses.
+Dependency updates come from Dependabot — Go modules, the actions, the
+JavaScript tooling and the gitleaks image, grouped weekly — and merge
+themselves once every required check is green. Two pins it cannot see are
+updated by hand: the distroless base in `.ko.yaml` and the Mailpit image the
+integration test uses.
 
 ## Security
 

@@ -1,9 +1,11 @@
 # Watches the images this repository pins by digest and says so when one moves.
 #
 # Dependabot cannot see these. Its docker ecosystem reads Dockerfiles and
-# Kubernetes manifests, and there is no Dockerfile here — ko assembles the image
+# Kubernetes manifests, and the root has no Dockerfile — ko assembles the image
 # itself, and the test's mail server is pinned in a Go constant. So the base
 # image, the one a CVE fix would land in, had nothing watching it at all.
+# The stub Dockerfile in .github/gitleaks/ is the exception: Dependabot owns
+# that pin, so the check leaves it out.
 #
 # It opens an issue rather than a pull request on purpose. A pull request raised
 # with GITHUB_TOKEN does not start the workflows whose checks the ruleset
