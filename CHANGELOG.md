@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.18](https://github.com/alrayyes/form-handler/compare/v2.2.17...v2.2.18) (2026-11-12)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/testcontainers/testcontainers-go ([#184](https://github.com/alrayyes/form-handler/issues/184)) ([5f8407d](https://github.com/alrayyes/form-handler/commit/5f8407ded9b7904a1f8d1f3a6bb9921017a3e9a8))
+
 ## [2.2.17](https://github.com/alrayyes/form-handler/compare/v2.2.16...v2.2.17) (2026-10-27)
 
 
