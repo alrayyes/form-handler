@@ -268,8 +268,11 @@ and neither reads the other.
 Both run at push as well, from the same scripts, so a pipeline should not be
 the first place you learn about a misspelt product name. `mechanics` fetches
 ltex-ls-plus on first use: around 300 MB, cached outside the repository, and
-about ten seconds a run after that. The pre-push jobs run in parallel, so it
-costs roughly what the whole hook used to.
+about ten seconds a run after that. At push, it checks only the Markdown in the
+push, and all of it when `.ltex.json` or `scripts/lint-mechanics.sh` changed, so
+a push with no prose never starts the JVM. CI, and `bun run lint:mechanics` by
+hand, check every document. The pre-push jobs run in parallel, so it costs
+roughly what the whole hook used to.
 
 Prettier decides Markdown layout and markdownlint judges what Prettier
 produced. If the two ever disagree, Prettier wins and the markdownlint rule
