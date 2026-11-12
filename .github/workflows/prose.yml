@@ -17,6 +17,8 @@ on:
       - .vale.ini
       - .ltex.json
       - styles/**
+      - scripts/lint-mechanics.sh
+      - scripts/test-lint-mechanics.sh
       - .github/workflows/prose.yml
   pull_request:
     paths:
@@ -24,6 +26,8 @@ on:
       - .vale.ini
       - .ltex.json
       - styles/**
+      - scripts/lint-mechanics.sh
+      - scripts/test-lint-mechanics.sh
       - .github/workflows/prose.yml
   workflow_dispatch:
 
@@ -54,6 +58,9 @@ jobs:
       image: ghcr.io/alrayyes/ltex-cli-plus:18.7.0@sha256:15151badbb4dee3739293b8c3895c6079d4215b7f6e990d0e393d6c67ebc2616
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check the mechanics hook
+        run: ./scripts/test-lint-mechanics.sh
 
       - name: Check the prose this repository owns
         # safe.directory: actions/checkout's own fix for this writes to a

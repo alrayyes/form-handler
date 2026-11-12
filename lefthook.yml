@@ -153,9 +153,16 @@ pre-push:
     # Grammar and spelling. Left out of the hooks until now on the grounds that
     # it is a ~300 MB download, which it is — but it caches outside the
     # repository and then costs about ten seconds. Running it only in CI meant
-    # finding out about a misspelt product name a pipeline at a time.
+    # finding out about a misspelt product name a pipeline at a time. It takes
+    # only the Markdown in the push (a change to .ltex.json or the script checks
+    # all of it), so a push with no prose never starts the JVM. CI checks
+    # everything.
     - name: mechanics
-      run: bun run lint:mechanics
+      glob:
+        - "*.md"
+        - ".ltex.json"
+        - "scripts/lint-mechanics.sh"
+      run: ./scripts/lint-mechanics.sh {push_files}
 
     # The integration and container tests are not here on purpose: both want a
     # Docker daemon, the container test wants ko as well, and either takes the
