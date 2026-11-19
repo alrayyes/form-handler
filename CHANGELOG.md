@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.19](https://github.com/alrayyes/form-handler/compare/v2.2.18...v2.2.19) (2026-11-19)
+
+
+### Bug Fixes
+
+* **ci:** update ltex-cli-plus pinned digest ([#194](https://github.com/alrayyes/form-handler/issues/194)) ([fa05d1f](https://github.com/alrayyes/form-handler/commit/fa05d1ffe1f7208b88a8243dbb2ca047d2c69b26)), closes [#193](https://github.com/alrayyes/form-handler/issues/193)
+* **deps:** bump github.com/mailgun/mailgun-go/v5 ([#191](https://github.com/alrayyes/form-handler/issues/191)) ([4bec470](https://github.com/alrayyes/form-handler/commit/4bec4706ee53855d70fa085af0cbe94715c09eaf))
+* **deps:** bump go.opentelemetry.io/otel/trace from 1.44.0 to 1.47.0 ([#190](https://github.com/alrayyes/form-handler/issues/190)) ([d6060ed](https://github.com/alrayyes/form-handler/commit/d6060edc187332abba38ce6dd9eb906434c310e7))
+
 ## [2.2.18](https://github.com/alrayyes/form-handler/compare/v2.2.17...v2.2.18) (2026-11-12)
 
 
