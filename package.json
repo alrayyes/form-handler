@@ -19,10 +19,10 @@
     "smol-toml": "1.9.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
-    "@redocly/cli": "2.78.0",
+    "@redocly/cli": "2.82.0",
     "lefthook": "2.2.2",
     "markdownlint-cli2": "0.24.1",
     "prettier": "3.10.1",
